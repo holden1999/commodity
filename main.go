@@ -60,7 +60,7 @@ func main() {
 
 type server struct {
 	store *checklist.Store
-	cfg   fuzzy.Config
+	cfg   fuzzy.ConfigData
 }
 
 func (s *server) handleConfig(w http.ResponseWriter, r *http.Request) {

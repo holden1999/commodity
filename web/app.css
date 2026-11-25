@@ -306,6 +306,11 @@ input[type="range"] {
   white-space: nowrap;
 }
 
+.chip-tie {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
 .rank-score {
   font-variant-numeric: tabular-nums;
   font-weight: 700;

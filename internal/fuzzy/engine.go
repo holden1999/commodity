@@ -150,6 +150,40 @@ func valueOf(in Input, key string) float64 {
 	return 0
 }
 
+// setValue assigns v to the input field named key. It reports false for a key
+// that is not part of Input.
+func (in *Input) setValue(key string, v float64) bool {
+	switch key {
+	case "hujan":
+		in.Hujan = v
+	case "ph":
+		in.PH = v
+	case "kesuburan":
+		in.Kesuburan = v
+	case "mdpl":
+		in.Mdpl = v
+	case "slope":
+		in.Slope = v
+	case "aspect":
+		in.Aspect = v
+	case "jarakSungai":
+		in.JarakSungai = v
+	case "radiasi":
+		in.Radiasi = v
+	case "sebaran":
+		in.Sebaran = v
+	case "permintaan":
+		in.Permintaan = v
+	case "ndvi":
+		in.NDVI = v
+	case "risikoBanjir":
+		in.RisikoBanjir = v
+	default:
+		return false
+	}
+	return true
+}
+
 func roundTo(x float64, places int) float64 {
 	f := math.Pow(10, float64(places))
 	return math.Round(x*f) / f

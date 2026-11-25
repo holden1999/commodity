@@ -1,5 +1,10 @@
 package fuzzy
 
+import (
+	"fmt"
+	"math"
+)
+
 // Set is one triangular membership set. A flat left shoulder has A == B and a
 // flat right shoulder has B == C.
 type Set struct {
@@ -107,6 +112,78 @@ func Config() ConfigData {
 		Price:       price(),
 		Checklist:   checklist(),
 	}
+}
+
+// Normalize turns a partial request map into a full Input: missing keys take
+// the catalog default, every value is clamped to its variable range, and
+// unknown or non-finite values are rejected. The returned map echoes the
+// effective values so the API response shows what was actually scored.
+func (c ConfigData) Normalize(values map[string]float64) (Input, map[string]float64, error) {
+	var in Input
+	echo := make(map[string]float64, len(c.Variables))
+	known := make(map[string]bool, len(c.Variables))
+
+	for _, v := range c.Variables {
+		known[v.Key] = true
+		val, ok := values[v.Key]
+		if !ok {
+			val = v.Default
+		}
+		if math.IsNaN(val) || math.IsInf(val, 0) {
+			return Input{}, nil, fmt.Errorf("nilai %s tidak valid", v.Key)
+		}
+		val = math.Min(math.Max(val, v.Min), v.Max)
+		if !in.setValue(v.Key, val) {
+			return Input{}, nil, fmt.Errorf("variabel %s tidak dikenal", v.Key)
+		}
+		echo[v.Key] = val
+	}
+	for key := range values {
+		if !known[key] {
+			return Input{}, nil, fmt.Errorf("variabel %s tidak dikenal", key)
+		}
+	}
+	return in, echo, nil
+}
+
+// ZoneFor returns the elevation zone that contains mdpl. Values outside the
+// table are clamped to the first or the last zone.
+func (c ConfigData) ZoneFor(mdpl float64) Zone {
+	if len(c.Zones) == 0 {
+		return Zone{}
+	}
+	first, last := c.Zones[0], c.Zones[len(c.Zones)-1]
+	if mdpl <= first.Min {
+		return first
+	}
+	if mdpl >= last.Max {
+		return last
+	}
+	for _, z := range c.Zones {
+		if mdpl >= z.Min && mdpl < z.Max {
+			return z
+		}
+	}
+	return last
+}
+
+// HasChecklistItem reports whether group and id name a row in the catalog.
+func (c ConfigData) HasChecklistItem(group, id string) bool {
+	var items []ChecklistItem
+	switch group {
+	case "download":
+		items = c.Checklist.Download
+	case "sop":
+		items = c.Checklist.SOP
+	default:
+		return false
+	}
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func set(name, label string, a, b, c float64) Set {

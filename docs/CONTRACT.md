@@ -239,7 +239,7 @@ Response:
 ```json
 {
   "input": {"hujan":3500,"ph":5.5},
-  "zone": {"id":1,"name":"Dataran Sungai","min":180,"max":220,"advice":"..."},
+  "zone": {"id":2,"name":"Transisi","min":220,"max":260,"advice":"..."},
   "ranking": [{"key":"padi","label":"Padi","cycle":"musiman","score":82.4,
     "fired":[{"rule":"01","alpha":0.35}]}],
   "package": {"commodities":["padi","sayur_daun"],"reason":"Padi (musiman) + Sayur Daun (mingguan) ..."},
@@ -275,8 +275,9 @@ debounce (150 ms) on every change. Sections, in this order:
    the derived zone name next to the elevation slider.
 3. Result card: zone name and advice, top recommendation (label + score),
    ranked list of every scored commodity with a horizontal bar, score number,
-   cycle chip, and the firing rule ids (`rule 01 · α0.35`). Show the tumpang
-   sari package and its reason, and the notes.
+   cycle chip, the firing rule ids (`rule 01 · α0.35`), and a `seri` chip on a
+   row whose score equals the score of rank 1. Show the tumpang sari package
+   and its reason, and the notes.
 4. Harga Desa card: HPP and market inputs, computed village price, the 30/70
    split, the formula string, and the Bapanas source line.
 5. Checklist card: two groups (download 7, sop 6), checkbox state loaded from
@@ -300,11 +301,15 @@ Errors: show an inline Indonesian error line inside the affected card, never an
 Server side (engine owner):
 
 - `go vet ./...` and `go test ./...` pass.
-- `Evaluate` with defaults returns at least 5 commodities above 30, padi above
-  70, and no crash for extreme inputs (all mins, all maxs).
+- `Evaluate` with defaults fires rules 05, 11 and 15, and returns three
+  commodities above 30 (jagung 83.9, cabai 83.9, kacang tanah 82.0). A
+  commodity with no firing rule scores 0 and is omitted, so the ranking size
+  follows the rule base, not the commodity table. No crash for extreme inputs
+  (all mins, all maxs).
 - Score is always in `0..100`, and a repeated call returns identical output.
 - Fuzzification sanity: `mu(hujan, sedang)` at 3500 == 1, at 2300 == 0.
-- The NDVI gate lowers every score when ndvi drops to 0.2.
+- The NDVI gate lowers every score when `mu(ndvi, rendah) > 0.6`, which means
+  `ndvi` below 0.16; at 0.2 the membership is 0.5 and the gate is off.
 - Weights change nothing structurally: `trust` scales alpha only.
 
 UI side: the page works offline against the local server, all six sections

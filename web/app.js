@@ -217,7 +217,7 @@ function commodityLabel(key) {
   return String(key);
 }
 
-function renderRankItem(item, index) {
+function renderRankItem(item, index, tied) {
   const li = document.createElement('li');
   li.className = index === 0 ? 'rank is-top' : 'rank';
 
@@ -233,6 +233,14 @@ function renderRankItem(item, index) {
     const chip = document.createElement('span');
     chip.className = 'chip';
     chip.textContent = item.cycle;
+    line.appendChild(chip);
+  }
+
+  if (tied) {
+    const chip = document.createElement('span');
+    chip.className = 'chip chip-tie';
+    chip.textContent = 'seri';
+    chip.title = 'Skor sama dengan peringkat 1; urutan diputus oleh jumlah rule yang aktif.';
     line.appendChild(chip);
   }
 
@@ -323,7 +331,8 @@ function renderResult(data) {
     const list = document.createElement('ol');
     list.className = 'ranking';
     ranking.forEach(function (item, index) {
-      list.appendChild(renderRankItem(item, index));
+      const tied = index > 0 && Number(item.score) === Number(ranking[0].score);
+      list.appendChild(renderRankItem(item, index, tied));
     });
     body.appendChild(list);
   }
