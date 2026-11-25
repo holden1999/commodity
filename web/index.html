@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fuzzy Desa Ciapus</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1>Fuzzy Desa Ciapus</h1>
+    <p class="subtitle">Dari lahan Archipelago ke harga desa</p>
+    <span class="badge">Mamdani • centroid • skor 0–100</span>
+  </header>
+
+  <main class="layout">
+    <section class="card calculator" id="calculator-card" aria-labelledby="calculator-title">
+      <h2 id="calculator-title">Kalkulator lahan</h2>
+      <p class="card-note">Geser nilai variabel; hasil diperbarui otomatis.</p>
+      <p class="error" id="config-error" role="alert" hidden></p>
+      <div id="sliders"></div>
+      <p class="legend">Legenda: trust = bobot / 20, sehingga α rule = min(mu × trust) untuk tiap term.</p>
+    </section>
+
+    <section class="card result" id="result-card" aria-labelledby="result-title">
+      <h2 id="result-title">Hasil rekomendasi</h2>
+      <p class="error" id="result-error" role="alert" hidden></p>
+      <p class="sr-only" id="result-status" role="status" aria-live="polite"></p>
+      <div class="result-body" id="result-body">
+        <p class="placeholder" id="result-placeholder">Menunggu hasil…</p>
+      </div>
+    </section>
+
+    <section class="card price" id="price-card" aria-labelledby="price-title">
+      <h2 id="price-title">Harga Desa</h2>
+      <p class="error" id="price-error" role="alert" hidden></p>
+      <div class="price-grid">
+        <div class="price-field">
+          <label for="hpp">HPP (Rp/kg)</label>
+          <input id="hpp" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
+        </div>
+        <div class="price-field">
+          <label for="market">Harga pasar (Rp/kg)</label>
+          <input id="market" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
+        </div>
+      </div>
+      <div class="price-figure" id="price-figure">
+        <span class="price-label">Harga desa</span>
+        <strong class="price-value" id="village-price">—</strong>
+        <span class="price-unit">/kg</span>
+      </div>
+      <p class="price-split" id="price-split">30% tetangga desa · 70% jaringan antar-desa</p>
+      <p class="formula">village = hpp + 0.4 × (market − hpp)</p>
+      <p class="source" id="price-source"></p>
+    </section>
+
+    <section class="card checklist" id="checklist-card" aria-labelledby="checklist-title">
+      <h2 id="checklist-title">Checklist lapangan</h2>
+      <p class="error" id="checklist-error" role="alert" hidden></p>
+      <div id="checklist-groups"></div>
+    </section>
+  </main>
+
+  <footer class="footnote" id="footnote">
+    <p>Singkong hanya tampil di saran zona; rule base belum memberi skor.</p>
+    <p>Nilai per petak masih perlu validasi lapangan 5–10 sampel tanah.</p>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
