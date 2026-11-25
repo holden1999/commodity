@@ -41,3 +41,6 @@ go.work.sum
 Thumbs.db
 .idea/
 .vscode/
+
+# Original source document kept local; not part of the general template
+blueprint.html

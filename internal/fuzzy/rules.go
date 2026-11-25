@@ -373,6 +373,7 @@ func checklist() Checklist {
 			checklistItem("chirps", "CHIRPS", "Hujan bulanan. data.chc.ucsb.edu/products/CHIRPS-2.0"),
 			checklistItem("power", "NASA POWER", "Radiasi, suhu, hujan. power.larc.nasa.gov"),
 			checklistItem("osm_big", "OSM + BIG", "Jarak ke sungai/jalan dan batas desa. download.geofabrik.de dan tanahair.indonesia.go.id"),
+			checklistItem("bhumi", "BHUMI ATR/BPN", "Bidang tanah: batas, luas, dan status tanah per petak. bhumi.atrbpn.go.id/peta — katalog publik di /geonode/api/v2/resources, bidang tanah per wilayah perlu masuk."),
 			checklistItem("sentinel2", "Sentinel-2", "NDVI kesehatan vegetasi. dataspace.copernicus.eu"),
 			checklistItem("bapanas", "Bapanas terpisah", "Harga pasar + volatilitas. panelharga.badanpangan.go.id, data.badanpangan.go.id — jangan campur dengan data biofisik."),
 		},

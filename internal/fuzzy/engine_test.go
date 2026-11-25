@@ -360,8 +360,8 @@ func TestConfigCatalog(t *testing.T) {
 	if len(cfg.Rules[2].Consequences) != 0 || cfg.Rules[2].Text == "" {
 		t.Errorf("rule 03 must have text and no consequences: %#v", cfg.Rules[2])
 	}
-	if len(cfg.Checklist.Download) != 7 || len(cfg.Checklist.SOP) != 6 {
-		t.Errorf("checklist = %d download / %d sop, want 7 / 6", len(cfg.Checklist.Download), len(cfg.Checklist.SOP))
+	if len(cfg.Checklist.Download) != 8 || len(cfg.Checklist.SOP) != 6 {
+		t.Errorf("checklist = %d download / %d sop, want 8 / 6", len(cfg.Checklist.Download), len(cfg.Checklist.SOP))
 	}
 	if cfg.Checklist.Download[0].ID != "srtm" || cfg.Checklist.SOP[0].ID != "cuaca" {
 		t.Errorf("checklist order wrong: %q / %q", cfg.Checklist.Download[0].ID, cfg.Checklist.SOP[0].ID)

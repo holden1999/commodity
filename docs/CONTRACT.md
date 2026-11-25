@@ -8,7 +8,7 @@ Stack: Go 1.25 standard library only, HTML + vanilla JS, no build step, no npm.
 
 ## 1. Scope
 
-A single-binary web app for Desa Ciapus. It scores commodities per plot per
+A single-binary web app for one village. It scores commodities per plot per
 period with Mamdani fuzzy logic, returns a ranking and a tumpang sari package,
 and calculates Harga Desa. Two reference inputs exist: 12 measured variables
 (CHIRPS rain, SoilGrids pH, SOC/N, SRTM elevation, slope, aspect, OSM river
@@ -222,9 +222,10 @@ request to stdout.
 }
 ```
 
-Download checklist ids in order: `srtm`, `soilgrids`, `chirps`, `power`, `osm_big`,
-`sentinel2`, `bapanas`. SOP ids in order: `cuaca`, `skor`, `kuota`, `bayar`,
-`panen`, `evaluasi`. Labels and details come from blueprint sections 11 and 13.
+Download checklist ids in order: `srtm`, `soilgrids`, `chirps`, `power`,
+`osm_big`, `bhumi`, `sentinel2`, `bapanas`. SOP ids in order: `cuaca`, `skor`,
+`kuota`, `bayar`, `panen`, `evaluasi`. Labels and details come from blueprint
+sections 11 and 13, plus BHUMI for parcel boundaries.
 
 ### POST /api/evaluate
 
@@ -268,7 +269,7 @@ One page, Indonesian copy, no framework, no external assets. Load
 `/api/config` once, build the sliders from it, then `POST /api/evaluate` with
 debounce (150 ms) on every change. Sections, in this order:
 
-1. Header: title `Fuzzy Desa Ciapus`, subtitle `Dari lahan Archipelago ke harga
+1. Header: title `Fuzzy Desa`, subtitle `Dari lahan Archipelago ke harga
    desa`, badge `Mamdani • centroid • skor 0–100`.
 2. Calculator card: one slider per variable with label, current value + unit,
    min/max labels. Flood risk and other index inputs may be sliders too. Show
@@ -280,7 +281,7 @@ debounce (150 ms) on every change. Sections, in this order:
    and its reason, and the notes.
 4. Harga Desa card: HPP and market inputs, computed village price, the 30/70
    split, the formula string, and the Bapanas source line.
-5. Checklist card: two groups (download 7, sop 6), checkbox state loaded from
+5. Checklist card: two groups (download 8, sop 6), checkbox state loaded from
    the server and saved on toggle, with the completion counter `n / m`.
 6. Footnote: `Singkong hanya tampil di saran zona; rule base belum memberi skor.`
    plus `Nilai per petak masih perlu validasi lapangan 5–10 sampel tanah.`

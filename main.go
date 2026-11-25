@@ -1,5 +1,5 @@
-// Command commodity serves the Ciapus fuzzy village dashboard: one Go binary,
-// one HTML page, the Mamdani engine from internal/fuzzy.
+// Command commodity serves the fuzzy village dashboard: one Go binary, one
+// HTML page, the Mamdani engine from internal/fuzzy.
 package main
 
 import (

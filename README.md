@@ -1,12 +1,15 @@
-# Fuzzy Desa Ciapus
+# Fuzzy Desa
 
 Satu biner Go, satu halaman HTML: kalkulator fuzzy Mamdani untuk memilih
 komoditas per petak per periode, paket tumpang sari, dan Harga Desa.
 
-Sistem ini menerjemahkan `blueprint.html` menjadi aplikasi yang bisa dijalankan.
-Dua belas variabel terukur (CHIRPS, SoilGrids, SRTM, NASA POWER, OSM+BIG,
-Sentinel-2, Bapanas), delapan belas rule, agregasi maksimum, dan defuzzifikasi
-centroid menghasilkan skor 0-100 untuk tiap komoditas.
+Aplikasi ini bekerja untuk desa mana pun. Nilai bawaan variabel adalah satu
+lokasi acuan di dataran tinggi basah (232 mdpl, hujan 3500 mm/tahun, pH 5.5);
+ganti lewat slider atau `/api/evaluate`. Dua belas variabel terukur (CHIRPS,
+SoilGrids, SRTM, NASA POWER, OSM+BIG, Sentinel-2, Bapanas), delapan belas rule,
+agregasi maksimum, dan defuzzifikasi centroid menghasilkan skor 0-100 untuk
+tiap komoditas. Bidang tanah dari BHUMI ATR/BPN melengkapi batas dan status
+petak (lihat Sumber data).
 
 ## Jalankan
 
@@ -59,9 +62,9 @@ bawaan, nilai di luar rentang dijepit ke batas, kunci tak dikenal ditolak 400.
 
 Komoditas yang tidak punya rule aktif mendapat skor 0 dan tidak masuk ranking.
 Karena itu jumlah baris ranking mengikuti rule base, bukan tabel komoditas:
-pada nilai bawaan Ciapus hanya rule 05, 11, dan 15 yang aktif sehingga muncul
-tiga komoditas. Turunkan ketinggian ke 200 mdpl dan naikkan hujan ke 4400
-mm/tahun untuk melihat padi masuk lewat rule 01, 09, dan 14.
+pada nilai bawaan lokasi acuan hanya rule 05, 11, dan 15 yang aktif sehingga
+muncul tiga komoditas. Turunkan ketinggian ke 200 mdpl dan naikkan hujan ke
+4400 mm/tahun untuk melihat padi masuk lewat rule 01, 09, dan 14.
 
 ## Batas yang disengaja
 
@@ -84,8 +87,22 @@ internal/fuzzy/rules.go     katalog variabel, 18 rule, zona, harga, checklist
 internal/checklist/         penyimpanan checklist atomik (mutex + rename)
 web/                        index.html, app.js, app.css
 docs/CONTRACT.md            spesifikasi yang diikuti kedua workstream
-blueprint.html              dokumen sumber (v2, 24 Nov 2026)
 ```
+
+## Sumber data
+
+Delapan langkah di checklist `/api/checklist` adalah sumber datanya: SRTM,
+SoilGrids, CHIRPS, NASA POWER, OSM+BIG, BHUMI, Sentinel-2, dan Bapanas.
+
+BHUMI ATR/BPN (`https://bhumi.atrbpn.go.id/peta`) memberi bidang tanah: batas,
+luas, dan status tanah per petak. Katalog publiknya terbuka tanpa akun:
+`/geonode/api/v2/resources` (7 dataset nasional) dan
+`/geonode/api/bhumi/groups_with_resources` (538 kantor pertanahan). Bidang tanah
+per wilayah ada di balik login, jadi unduh manual lalu catat hasilnya; aplikasi
+tidak memanggil BHUMI saat berjalan. Data BHUMI dipakai untuk memastikan batas
+petak yang diukur, bukan sebagai variabel fuzzy. Situsnya menyatakan data
+diberikan apa adanya; ketidaksesuaian letak atau bentuk diklarifikasi ke kantor
+pertanahan setempat.
 
 ## Uji
 
