@@ -1,0 +1,8 @@
+name: ciapus
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.ciapus
+    ports:
+      - "127.0.0.1:8090:8090"

@@ -1,0 +1,224 @@
+import { useEffect, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+import { MAP_DEPTH, MAP_WIDTH, TARGET_Y, ZONE_WIDTH } from './layout.js';
+
+const CAMERA_OFFSET = new THREE.Vector3(1, 1.15, 1).normalize().multiplyScalar(90);
+const ELEVATION = Math.atan2(
+  CAMERA_OFFSET.y,
+  Math.hypot(CAMERA_OFFSET.x, CAMERA_OFFSET.z),
+);
+const COS_ELEVATION = Math.cos(ELEVATION);
+const FOCUS_MARGIN = 6;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+export interface CameraFocus {
+  x: number;
+  y: number;
+  z: number;
+  zoom: 'home' | 'zone';
+}
+
+interface CameraRigProps {
+  focusTarget: CameraFocus;
+  focusNonce: number;
+}
+
+/**
+ * Orthographic strategy camera. Left-drag pans, the wheel zooms, and the
+ * target stays near the map. A zona selection drives a smooth focus move.
+ */
+export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
+  const { camera, gl, size } = useThree();
+  const goal = useRef(new THREE.Vector3(0, TARGET_Y, 0));
+  const current = useRef(goal.current.clone());
+  const zoomGoal = useRef(2);
+  const minZoom = useRef(1);
+  const maxZoom = useRef(4);
+  const homeZoom = useRef(2);
+  const initialized = useRef(false);
+  const focusRef = useRef(focusTarget);
+  const sizeRef = useRef(size);
+  focusRef.current = focusTarget;
+  sizeRef.current = size;
+
+  useEffect(() => {
+    const cam = camera as THREE.OrthographicCamera;
+    if (!cam.isOrthographicCamera) return;
+
+    const aspect = size.width / Math.max(1, size.height);
+    const viewHeight = MAP_DEPTH * 1.35;
+    const viewWidth = viewHeight * aspect;
+
+    cam.left = -viewWidth / 2;
+    cam.right = viewWidth / 2;
+    cam.top = viewHeight / 2;
+    cam.bottom = -viewHeight / 2;
+    cam.near = 0.1;
+    cam.far = 300;
+    cam.updateProjectionMatrix();
+
+    const fitZoom = Math.min(viewWidth / MAP_WIDTH, viewHeight / MAP_DEPTH) * 0.95;
+    minZoom.current = Math.max(0.6, fitZoom);
+    maxZoom.current = Math.max(minZoom.current + 1, minZoom.current * 3.5);
+
+    if (!initialized.current) {
+      zoomGoal.current = clamp(fitZoom * 1.35, minZoom.current, maxZoom.current);
+      homeZoom.current = zoomGoal.current;
+      initialized.current = true;
+    } else {
+      zoomGoal.current = clamp(zoomGoal.current, minZoom.current, maxZoom.current);
+    }
+  }, [camera, size.width, size.height]);
+
+  const limits = (zoom: number): { x: number; z: number } | null => {
+    const cam = camera as THREE.OrthographicCamera;
+    if (
+      !Number.isFinite(cam.left) ||
+      !Number.isFinite(cam.right) ||
+      !Number.isFinite(cam.top) ||
+      !Number.isFinite(cam.bottom) ||
+      !Number.isFinite(zoom) ||
+      zoom <= 0
+    ) {
+      return null;
+    }
+    const visibleWidth = (cam.right - cam.left) / zoom;
+    const visibleHeight = (cam.top - cam.bottom) / zoom;
+    const groundHeight = visibleHeight / COS_ELEVATION;
+    const x = Math.max(1.2, MAP_WIDTH / 2 - visibleWidth / 2);
+    const z = Math.max(1.2, MAP_DEPTH / 2 + FOCUS_MARGIN - groundHeight / 2);
+    return Number.isFinite(x) && Number.isFinite(z) ? { x, z } : null;
+  };
+
+  const clampGoal = () => {
+    const limit = limits(zoomGoal.current);
+    if (!limit) return;
+    goal.current.x = clamp(goal.current.x, -limit.x, limit.x);
+    goal.current.z = clamp(goal.current.z, -limit.z, limit.z);
+  };
+
+  useEffect(() => {
+    const target = focusRef.current;
+    const cam = camera as THREE.OrthographicCamera;
+    const viewWidth = cam.right - cam.left;
+    const zoneZoom =
+      Number.isFinite(viewWidth) && viewWidth > 0
+        ? viewWidth / (ZONE_WIDTH * 1.15)
+        : 2.4;
+    goal.current.set(target.x, target.y, target.z);
+    zoomGoal.current =
+      target.zoom === 'zone'
+        ? clamp(zoneZoom, minZoom.current, maxZoom.current)
+        : homeZoom.current;
+    clampGoal();
+  }, [focusNonce, size.width, size.height]);
+
+  useEffect(() => {
+    const dom = gl.domElement;
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let pointerId = -1;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      dragging = true;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      pointerId = event.pointerId;
+      dom.setPointerCapture(event.pointerId);
+      dom.style.cursor = 'grabbing';
+      event.preventDefault();
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (!dragging) return;
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      lastX = event.clientX;
+      lastY = event.clientY;
+
+      const cam = camera as THREE.OrthographicCamera;
+      const viewportHeight = Math.max(1, sizeRef.current.height);
+      const worldPerPixel = (cam.top - cam.bottom) / viewportHeight / cam.zoom;
+      const right = new THREE.Vector3(1, 0, 0)
+        .applyQuaternion(cam.quaternion)
+        .setY(0)
+        .normalize();
+      const up = new THREE.Vector3(0, 1, 0)
+        .applyQuaternion(cam.quaternion)
+        .setY(0)
+        .normalize();
+
+      goal.current.addScaledVector(right, -dx * worldPerPixel);
+      goal.current.addScaledVector(up, (dy * worldPerPixel) / COS_ELEVATION);
+      clampGoal();
+      event.preventDefault();
+    };
+
+    const endDrag = (event: PointerEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      if (pointerId >= 0 && dom.hasPointerCapture(pointerId)) {
+        dom.releasePointerCapture(pointerId);
+      }
+      pointerId = -1;
+      dom.style.cursor = 'grab';
+      event.preventDefault();
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const next = zoomGoal.current * Math.exp(-event.deltaY * 0.0014);
+      zoomGoal.current = clamp(next, minZoom.current, maxZoom.current);
+      clampGoal();
+    };
+
+    dom.style.cursor = 'grab';
+    dom.style.touchAction = 'none';
+    dom.addEventListener('pointerdown', onPointerDown);
+    dom.addEventListener('pointermove', onPointerMove);
+    dom.addEventListener('pointerup', endDrag);
+    dom.addEventListener('pointercancel', endDrag);
+    dom.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => {
+      dom.removeEventListener('pointerdown', onPointerDown);
+      dom.removeEventListener('pointermove', onPointerMove);
+      dom.removeEventListener('pointerup', endDrag);
+      dom.removeEventListener('pointercancel', endDrag);
+      dom.removeEventListener('wheel', onWheel);
+      dom.style.cursor = '';
+      dom.style.touchAction = '';
+    };
+  }, [camera, gl]);
+
+  useFrame((_, delta) => {
+    const cam = camera as THREE.OrthographicCamera;
+    if (!cam.isOrthographicCamera) return;
+
+    if (!Number.isFinite(current.current.x) || !Number.isFinite(current.current.z)) {
+      current.current.set(0, TARGET_Y, 0);
+    }
+    if (!Number.isFinite(goal.current.x) || !Number.isFinite(goal.current.z)) {
+      goal.current.set(0, TARGET_Y, 0);
+    }
+
+    const damping = 1 - Math.exp(-12 * Math.min(delta, 0.1));
+    clampGoal();
+    current.current.lerp(goal.current, damping);
+    const nextZoom = THREE.MathUtils.lerp(cam.zoom, zoomGoal.current, damping);
+    if (Math.abs(nextZoom - cam.zoom) > 0.0001) {
+      cam.zoom = nextZoom;
+      cam.updateProjectionMatrix();
+    }
+    cam.position.copy(current.current).add(CAMERA_OFFSET);
+    cam.lookAt(current.current);
+    cam.updateMatrixWorld();
+  });
+
+  return null;
+}

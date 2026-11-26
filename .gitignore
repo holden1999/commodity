@@ -33,14 +33,25 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# Runtime state (shared checklist)
-/data/
-
 # Editor / OS noise
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+
+# Local map fetch cache and QA artifacts
+.cache/
+.qa/
+*.log
+
+# TypeScript data layer
+node_modules/
+/dist/
+build-data/
+
+# Vite output embedded by Go
+internal/web/dist/*
+!internal/web/dist/.gitkeep
 
 # Original source document kept local; not part of the general template
 blueprint.html
