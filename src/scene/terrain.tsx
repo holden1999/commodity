@@ -5,6 +5,8 @@ import {
   MAP_WIDTH,
   TERRAIN_MAX_MDPL,
   TERRAIN_MIN_MDPL,
+  TERRAIN_SEGMENTS_X,
+  TERRAIN_SEGMENTS_Z,
   sampleElevation,
   terrainYAt,
 } from './terrainField.js';
@@ -13,7 +15,12 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
 function buildTerrainGeometry() {
-  const geometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_DEPTH, 56, 48);
+  const geometry = new THREE.PlaneGeometry(
+    MAP_WIDTH,
+    MAP_DEPTH,
+    TERRAIN_SEGMENTS_X,
+    TERRAIN_SEGMENTS_Z,
+  );
   geometry.rotateX(-Math.PI / 2);
   const positions = geometry.attributes.position;
   const colors = new Float32Array(positions.count * 3);

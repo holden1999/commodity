@@ -214,24 +214,42 @@ function zoneFillGeometry(cells: readonly ZoneCell[]) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
-  geometry.computeVertexNormals();
   return geometry;
 }
 
 function zoneBoundaryGeometry(segments: readonly ZoneSegment[]) {
   const positions: number[] = [];
+  const indices: number[] = [];
+  const half = 0.11;
+
   for (const segment of segments) {
-    positions.push(
-      segment.x1,
-      terrainYAt(segment.x1, segment.z1) + 0.06,
-      segment.z1,
-      segment.x2,
-      terrainYAt(segment.x2, segment.z2) + 0.06,
-      segment.z2,
-    );
+    const dx = segment.x2 - segment.x1;
+    const dz = segment.z2 - segment.z1;
+    const length = Math.hypot(dx, dz);
+    if (length < 0.0001) continue;
+
+    const nx = (-dz / length) * half;
+    const nz = (dx / length) * half;
+    const base = positions.length / 3;
+    for (const [x, z] of [
+      [segment.x1, segment.z1],
+      [segment.x2, segment.z2],
+    ] as const) {
+      positions.push(
+        x + nx,
+        terrainYAt(x + nx, z + nz) + 0.07,
+        z + nz,
+        x - nx,
+        terrainYAt(x - nx, z - nz) + 0.07,
+        z - nz,
+      );
+    }
+    indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
   }
+
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
   return geometry;
 }
 
@@ -268,14 +286,15 @@ export function ZonaTerrace({
           side={THREE.DoubleSide}
         />
       </mesh>
-      <lineSegments geometry={boundary} raycast={() => {}}>
-        <lineBasicMaterial
+      <mesh geometry={boundary} raycast={() => {}}>
+        <meshBasicMaterial
           color={color}
           transparent
-          opacity={selected ? 0.95 : 0.5}
+          opacity={selected ? 0.95 : 0.62}
           depthWrite={false}
+          side={THREE.DoubleSide}
         />
-      </lineSegments>
+      </mesh>
       <MapLabel
         position={[placement.centerX, labelY, placement.centerZ]}
         tone="zone"
@@ -303,7 +322,7 @@ function patchGeometry(
   const positions: number[] = [];
   const colors: number[] = [];
   const indices: number[] = [];
-  const cells = 3;
+  const cells = 8;
   const stride = cells + 1;
   const color = new THREE.Color();
 

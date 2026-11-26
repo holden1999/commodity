@@ -5,12 +5,18 @@ export const MAP_WIDTH = 84;
 export const MAP_DEPTH = 72;
 export const TARGET_Y = 4;
 
+/** One DEM sample per 100-column grid; tuned for a 1:100 landscape read. */
+export const TERRAIN_COLS = TERRAIN_BOUNDS.cols;
+export const TERRAIN_ROWS = TERRAIN_BOUNDS.rows;
+export const TERRAIN_SEGMENTS_X = TERRAIN_COLS - 1;
+export const TERRAIN_SEGMENTS_Z = TERRAIN_ROWS - 1;
+
 export const TERRAIN_MIN_MDPL = Math.min(...TERRAIN_ELEVATION);
 export const TERRAIN_MAX_MDPL = Math.max(...TERRAIN_ELEVATION);
 export const TERRAIN_Y_MAX = 10;
 
 /**
- * The DEM grid covers 207-261 mdpl, while the seed zone bands span 200-325.
+ * The DEM grid covers 205-262 mdpl, while the seed zone bands span 200-325.
  * Stretch the local relief into the seed range so zone bands keep the real
  * terrain shape without inventing a second terrain surface.
  */

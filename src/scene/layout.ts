@@ -1,8 +1,8 @@
 import type { Petak, SeedData, Zona } from '../types.js';
-import { MAP_DEPTH, MAP_WIDTH, terrainMdplAt, terrainYAt } from './terrainField.js';
+import { MAP_DEPTH, MAP_WIDTH, TERRAIN_COLS, TERRAIN_ROWS, terrainMdplAt, terrainYAt } from './terrainField.js';
 
-const ZONE_COLS = 42;
-const ZONE_ROWS = 36;
+const ZONE_COLS = TERRAIN_COLS;
+const ZONE_ROWS = TERRAIN_ROWS;
 const AREA_PER_HA = 24;
 const GAP = 0.9;
 
