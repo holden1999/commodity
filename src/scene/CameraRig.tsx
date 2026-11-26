@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { MAP_DEPTH, MAP_WIDTH, TARGET_Y, ZONE_WIDTH } from './layout.js';
+import { MAP_DEPTH, MAP_WIDTH, TARGET_Y } from './terrainField.js';
 
 const CAMERA_OFFSET = new THREE.Vector3(1, 1.15, 1).normalize().multiplyScalar(90);
 const ELEVATION = Math.atan2(
@@ -9,7 +9,8 @@ const ELEVATION = Math.atan2(
   Math.hypot(CAMERA_OFFSET.x, CAMERA_OFFSET.z),
 );
 const COS_ELEVATION = Math.cos(ELEVATION);
-const FOCUS_MARGIN = 6;
+const RIGHT_GROUND = new THREE.Vector3(1, 0, -1).normalize();
+const UP_GROUND = new THREE.Vector3(-1, 0, -1).normalize();
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -19,6 +20,7 @@ export interface CameraFocus {
   y: number;
   z: number;
   zoom: 'home' | 'zone';
+  span: number;
 }
 
 interface CameraRigProps {
@@ -60,13 +62,17 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     cam.far = 300;
     cam.updateProjectionMatrix();
 
-    const fitZoom = Math.min(viewWidth / MAP_WIDTH, viewHeight / MAP_DEPTH) * 0.95;
+    const fitZoom =
+      Math.min(
+        viewWidth / MAP_WIDTH,
+        viewHeight / (MAP_DEPTH * COS_ELEVATION),
+      ) * 1.02;
     minZoom.current = Math.max(0.6, fitZoom);
     maxZoom.current = Math.max(minZoom.current + 1, minZoom.current * 3.5);
+    homeZoom.current = minZoom.current;
 
     if (!initialized.current) {
-      zoomGoal.current = clamp(fitZoom * 1.35, minZoom.current, maxZoom.current);
-      homeZoom.current = zoomGoal.current;
+      zoomGoal.current = minZoom.current;
       initialized.current = true;
     } else {
       zoomGoal.current = clamp(zoomGoal.current, minZoom.current, maxZoom.current);
@@ -85,12 +91,17 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     ) {
       return null;
     }
-    const visibleWidth = (cam.right - cam.left) / zoom;
-    const visibleHeight = (cam.top - cam.bottom) / zoom;
-    const groundHeight = visibleHeight / COS_ELEVATION;
-    const x = Math.max(1.2, MAP_WIDTH / 2 - visibleWidth / 2);
-    const z = Math.max(1.2, MAP_DEPTH / 2 + FOCUS_MARGIN - groundHeight / 2);
-    return Number.isFinite(x) && Number.isFinite(z) ? { x, z } : null;
+
+    const halfWidth = (cam.right - cam.left) / (2 * zoom);
+    const halfHeight = (cam.top - cam.bottom) / (2 * zoom * COS_ELEVATION);
+    const halfX =
+      Math.abs(RIGHT_GROUND.x) * halfWidth + Math.abs(UP_GROUND.x) * halfHeight;
+    const halfZ =
+      Math.abs(RIGHT_GROUND.z) * halfWidth + Math.abs(UP_GROUND.z) * halfHeight;
+    return {
+      x: Math.max(0, MAP_WIDTH / 2 - halfX),
+      z: Math.max(0, MAP_DEPTH / 2 - halfZ),
+    };
   };
 
   const clampGoal = () => {
@@ -106,7 +117,7 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     const viewWidth = cam.right - cam.left;
     const zoneZoom =
       Number.isFinite(viewWidth) && viewWidth > 0
-        ? viewWidth / (ZONE_WIDTH * 1.15)
+        ? viewWidth / (Math.max(4, target.span) * 1.15)
         : 2.4;
     goal.current.set(target.x, target.y, target.z);
     zoomGoal.current =

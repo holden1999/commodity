@@ -66,4 +66,7 @@ until a cited source replaces them.
 
 The terrain grid comes from OpenTopoData SRTM 90 m for the Ciapus bounding box
 from OpenStreetMap relation 19957780. Rivers and roads come from
-OpenStreetMap/Overpass. The map is a stylized display, not a survey.
+OpenStreetMap/Overpass. Zone cells follow the DEM elevation bands; the local
+207–261 m relief is stretched into the seed's 200–325 mdpl range. Plots are
+packed inside those cells using their `luasHa` values. The map is a stylized
+display, not a survey.

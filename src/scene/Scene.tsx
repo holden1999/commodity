@@ -4,8 +4,9 @@ import { seed } from '../data/index.js';
 import type { SceneVisibility } from '../logic/filters.js';
 import type { Selection } from '../logic/types.js';
 import { ROADS, RIVERS } from './mapData.js';
-import { buildLayout, PASAR_POSITION, TARGET_Y } from './layout.js';
-import { terrainYAt, Terrain } from './terrain.js';
+import { buildLayout, PASAR_POSITION } from './layout.js';
+import { MAP_WIDTH, TARGET_Y, terrainYAt } from './terrainField.js';
+import { Terrain } from './terrain.js';
 import { CameraRig } from './CameraRig.js';
 import {
   KandangPen,
@@ -34,17 +35,7 @@ export function Scene({
   focusZonaId,
   focusNonce,
 }: SceneProps) {
-  const layout = useMemo(() => {
-    const next = buildLayout(seed);
-    for (const zone of next.zones) {
-      zone.baseY = terrainYAt(0, zone.centerZ);
-      zone.topY = zone.baseY + 0.15;
-    }
-    for (const placement of next.petak.values()) {
-      placement.topY = terrainYAt(placement.x, placement.z) + 0.28;
-    }
-    return next;
-  }, []);
+  const layout = useMemo(() => buildLayout(seed), []);
   const komoditasById = useMemo(
     () => new Map(seed.komoditas.map((row) => [row.id, row])),
     [],
@@ -54,12 +45,13 @@ export function Scene({
     : undefined;
   const focusTarget = focusZone
     ? {
-        x: 0,
+        x: focusZone.centerX,
         y: focusZone.topY + 1.2,
-        z: focusZone.centerZ + 4,
+        z: focusZone.centerZ,
         zoom: 'zone' as const,
+        span: focusZone.span,
       }
-    : { x: 0, y: TARGET_Y, z: 0, zoom: 'home' as const };
+    : { x: 0, y: TARGET_Y, z: 0, zoom: 'home' as const, span: MAP_WIDTH };
   const isSelected = (kind: Selection['kind'], id: string) =>
     selected?.kind === kind && selected.id === id;
   const visiblePetak = useMemo(
