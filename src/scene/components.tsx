@@ -720,7 +720,7 @@ export function Pasar({
   );
 }
 
-const RIVER_SEGMENTS = 14;
+const RIVER_SEGMENTS = 100;
 
 function ribbonGeometry(
   points: readonly (readonly [number, number])[],
@@ -774,15 +774,15 @@ export function River({
   onSelect,
 }: { spec: MapRiver } & SelectableProps) {
   const bank = useMemo(
-    () => ribbonGeometry(spec.points, spec.width + 1.7, terrainYAt, 0.03),
+    () => ribbonGeometry(spec.points, spec.width + 1.7, terrainYAt, 0.12),
     [spec],
   );
   const water = useMemo(
-    () => ribbonGeometry(spec.points, spec.width, terrainYAt, 0.05),
+    () => ribbonGeometry(spec.points, spec.width, terrainYAt, 0.2),
     [spec],
   );
   const outline = useMemo(
-    () => ribbonGeometry(spec.points, spec.width + 1.2, terrainYAt, 0.09),
+    () => ribbonGeometry(spec.points, spec.width + 1.2, terrainYAt, 0.28),
     [spec],
   );
 
@@ -822,6 +822,9 @@ export function River({
           roughness={1}
           side={THREE.DoubleSide}
           flatShading
+          polygonOffset
+          polygonOffsetFactor={-1}
+          polygonOffsetUnits={-1}
         />
       </mesh>
       <mesh geometry={water} receiveShadow>
@@ -833,6 +836,9 @@ export function River({
           opacity={0.95}
           side={THREE.DoubleSide}
           flatShading
+          polygonOffset
+          polygonOffsetFactor={-2}
+          polygonOffsetUnits={-2}
         />
       </mesh>
       {spec.showLabel ? (
