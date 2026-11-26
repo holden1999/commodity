@@ -68,5 +68,6 @@ The terrain grid comes from OpenTopoData SRTM 30 m for the Ciapus bounding box
 from OpenStreetMap relation 19957780, sampled at 100 columns by 86 rows. Rivers
 and roads come from OpenStreetMap/Overpass. Zone cells follow the DEM elevation
 bands; the local 205–262 m relief is stretched into the seed's 200–325 mdpl
-range. Plots are packed inside those cells using their `luasHa` values. The map
-is a stylized display, not a survey.
+range. Plots are packed inside those cells using their `luasHa` values. The
+terrain is padded 12 world units outside the village; only that outer pad fades
+to the background. The map is a stylized display, not a survey.

@@ -8,6 +8,8 @@ import {
   TERRAIN_MIN_MDPL,
   TERRAIN_SEGMENTS_X,
   TERRAIN_SEGMENTS_Z,
+  TERRAIN_WIDTH,
+  TERRAIN_DEPTH,
   sampleElevation,
   terrainYAt,
 } from './terrainField.js';
@@ -17,8 +19,8 @@ const clamp = (value: number, min: number, max: number) =>
 
 function buildTerrainGeometry() {
   const geometry = new THREE.PlaneGeometry(
-    MAP_WIDTH,
-    MAP_DEPTH,
+    TERRAIN_WIDTH,
+    TERRAIN_DEPTH,
     TERRAIN_SEGMENTS_X,
     TERRAIN_SEGMENTS_Z,
   );
@@ -67,14 +69,15 @@ function buildTerrainGeometry() {
   }
 
   const background = new THREE.Color(MAP_BACKGROUND);
-  const fadeWidth = 8;
+  const fadeWidth = 10;
   const edgeColor = new THREE.Color();
   for (let index = 0; index < positions.count; index += 1) {
-    const edge = Math.min(
-      MAP_WIDTH / 2 - Math.abs(positions.getX(index)),
-      MAP_DEPTH / 2 - Math.abs(positions.getZ(index)),
+    const outside = Math.max(
+      0,
+      Math.abs(positions.getX(index)) - MAP_WIDTH / 2,
+      Math.abs(positions.getZ(index)) - MAP_DEPTH / 2,
     );
-    const opacity = clamp(edge / fadeWidth, 0, 1);
+    const opacity = clamp(1 - outside / fadeWidth, 0, 1);
     edgeColor
       .setRGB(
         colors[index * 3] ?? 0,

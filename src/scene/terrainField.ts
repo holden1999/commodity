@@ -8,8 +8,14 @@ export const TARGET_Y = 4;
 /** One DEM sample per 100-column grid; tuned for a 1:100 landscape read. */
 export const TERRAIN_COLS = TERRAIN_BOUNDS.cols;
 export const TERRAIN_ROWS = TERRAIN_BOUNDS.rows;
-export const TERRAIN_SEGMENTS_X = TERRAIN_COLS - 1;
-export const TERRAIN_SEGMENTS_Z = TERRAIN_ROWS - 1;
+export const TERRAIN_PADDING = 12;
+export const TERRAIN_PAD_SEGMENTS = 14;
+export const TERRAIN_WIDTH = MAP_WIDTH + TERRAIN_PADDING * 2;
+export const TERRAIN_DEPTH = MAP_DEPTH + TERRAIN_PADDING * 2;
+export const TERRAIN_SEGMENTS_X =
+  TERRAIN_COLS - 1 + TERRAIN_PAD_SEGMENTS * 2;
+export const TERRAIN_SEGMENTS_Z =
+  TERRAIN_ROWS - 1 + TERRAIN_PAD_SEGMENTS * 2;
 
 export const TERRAIN_MIN_MDPL = Math.min(...TERRAIN_ELEVATION);
 export const TERRAIN_MAX_MDPL = Math.max(...TERRAIN_ELEVATION);
