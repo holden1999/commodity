@@ -2,12 +2,14 @@ import { useMemo } from 'react';
 import { OrthographicCamera } from '@react-three/drei';
 import { seed } from '../data/index.js';
 import type { SceneVisibility } from '../logic/filters.js';
-import type { Selection } from '../logic/types.js';
+import type { LiveState, Selection } from '../logic/types.js';
+import type { TipeTransaksi } from '../types.js';
 import { ROADS, RIVERS } from './mapData.js';
 import { buildLayout, PASAR_POSITION } from './layout.js';
 import { MAP_WIDTH, TARGET_Y, MAP_BACKGROUND, terrainYAt } from './terrainField.js';
 import { Terrain } from './terrain.js';
 import { CameraRig } from './CameraRig.js';
+import { LogisticsTraffic } from './LogisticsTraffic.js';
 import {
   KandangPen,
   KolamPond,
@@ -20,20 +22,36 @@ import {
   ZonaTerrace,
 } from './components.js';
 
+const NIGHT_BACKGROUND = '#0d1b26';
+
 interface SceneProps {
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
   visible: SceneVisibility;
+  live: LiveState;
   focusZonaId: string | null;
   focusNonce: number;
+  night: boolean;
+  cutaway: boolean;
+  simPlaying: boolean;
+  simSpeed: number;
+  rantaiPasokType: TipeTransaksi | 'Semua';
+  selectedRantaiId: string | null;
 }
 
 export function Scene({
   selected,
   onSelect,
   visible,
+  live,
   focusZonaId,
   focusNonce,
+  night,
+  cutaway,
+  simPlaying,
+  simSpeed,
+  rantaiPasokType,
+  selectedRantaiId,
 }: SceneProps) {
   const layout = useMemo(() => buildLayout(seed), []);
   const komoditasById = useMemo(
@@ -67,10 +85,12 @@ export function Scene({
     [layout, komoditasById, visible.petak],
   );
 
+  const bg = night ? NIGHT_BACKGROUND : MAP_BACKGROUND;
+
   return (
     <>
-      <color attach="background" args={[MAP_BACKGROUND]} />
-      <fog attach="fog" args={[MAP_BACKGROUND, 95, 190]} />
+      <color attach="background" args={[bg]} />
+      <fog attach="fog" args={[bg, 95, 190]} />
 
       <OrthographicCamera
         makeDefault
@@ -81,14 +101,17 @@ export function Scene({
       />
       <CameraRig focusTarget={focusTarget} focusNonce={focusNonce} />
 
-      <ambientLight intensity={0.6} />
-      <hemisphereLight args={['#ffffff', '#6d8f5f', 0.45]} />
+      <ambientLight intensity={night ? 0.35 : 0.6} />
+      <hemisphereLight
+        args={night ? ['#7ab6e6', '#1b2d3b', 0.4] : ['#ffffff', '#6d8f5f', 0.45]}
+      />
       <directionalLight
         castShadow
         position={[38, 62, 28]}
-        intensity={1.9}
-        shadow-mapSize-width={512}
-        shadow-mapSize-height={512}
+        intensity={night ? 1.1 : 1.9}
+        color={night ? '#b7d7f7' : '#ffffff'}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-camera-left={-55}
         shadow-camera-right={55}
         shadow-camera-top={55}
@@ -97,10 +120,10 @@ export function Scene({
         shadow-camera-far={180}
         shadow-bias={-0.0003}
         shadow-normalBias={0.02}
-        shadow-radius={4}
+        shadow-radius={6}
       />
 
-      <Terrain />
+      <Terrain night={night} />
 
       {layout.zones.map((zone) => (
         <ZonaTerrace
@@ -111,14 +134,20 @@ export function Scene({
         />
       ))}
 
-      {visiblePetak.map(({ placement }) => (
-        <PetakPlot
-          key={placement.petak.id}
-          placement={placement}
-          selected={isSelected('petak', placement.petak.id)}
-          onSelect={() => onSelect({ kind: 'petak', id: placement.petak.id })}
-        />
-      ))}
+      {visiblePetak.map(({ placement }) => {
+        const currentRain =
+          live.rainfallByPetak[placement.petak.id] ?? placement.petak.curahHujanMm;
+        const lowWater = currentRain < placement.petak.curahHujanMm * 0.9;
+        return (
+          <PetakPlot
+            key={placement.petak.id}
+            placement={placement}
+            lowWater={lowWater}
+            selected={isSelected('petak', placement.petak.id)}
+            onSelect={() => onSelect({ kind: 'petak', id: placement.petak.id })}
+          />
+        );
+      })}
       <PetakSurfaces rows={visiblePetak} />
 
       {seed.kolam.map((kolam) => {
@@ -132,7 +161,7 @@ export function Scene({
             kolam={kolam}
             komoditas={komoditas}
             placement={placement}
-            offsetX={sharedWithPen ? -1.9 : 0}
+            offsetX={sharedWithPen ? -1.1 : 0}
             compact={sharedWithPen}
             selected={isSelected('kolam', kolam.id)}
             onSelect={() => onSelect({ kind: 'kolam', id: kolam.id })}
@@ -151,8 +180,10 @@ export function Scene({
             ternak={ternak}
             komoditas={komoditas}
             placement={placement}
-            offsetX={sharedWithPond ? 1.9 : 0}
+            offsetX={sharedWithPond ? 1.1 : 0}
             compact={sharedWithPond}
+            cutaway={cutaway}
+            night={night}
             selected={isSelected('ternak', ternak.id)}
             onSelect={() => onSelect({ kind: 'ternak', id: ternak.id })}
           />
@@ -161,6 +192,8 @@ export function Scene({
 
       <Pasar
         topY={terrainYAt(PASAR_POSITION.x, PASAR_POSITION.z) + 0.1}
+        cutaway={cutaway}
+        night={night}
         selected={isSelected('pasar', 'pasar-desa-ciapus')}
         onSelect={() => onSelect({ kind: 'pasar', id: 'pasar-desa-ciapus' })}
       />
@@ -177,6 +210,14 @@ export function Scene({
       {ROADS.map((road) => (
         <Road key={road.id} spec={road} />
       ))}
+
+      <LogisticsTraffic
+        rantaiPasokType={rantaiPasokType}
+        selectedRantaiId={selectedRantaiId}
+        simPlaying={simPlaying}
+        simSpeed={simSpeed}
+        night={night}
+      />
 
       <Trees />
     </>

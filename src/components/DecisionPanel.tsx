@@ -48,11 +48,17 @@ const scoreText = (score: number | null) => {
 export function DecisionPanel() {
   const selection = useAppStore((state) => state.selection);
   const live = useAppStore((state) => state.live);
+  const serverDecision = useAppStore((state) => state.decision);
   const clearSelection = useAppStore((state) => state.clearSelection);
+  const simPlaying = useAppStore((state) => state.simPlaying);
+  const simSpeed = useAppStore((state) => state.simSpeed);
 
   const status = useMemo(
-    () => (selection ? buildDecisionStatus(selection, live) : null),
-    [selection, live],
+    () =>
+      selection
+        ? serverDecision ?? buildDecisionStatus(selection, live)
+        : null,
+    [selection, serverDecision, live],
   );
 
   if (!status) return null;
@@ -140,7 +146,8 @@ export function DecisionPanel() {
       </section>
 
       <p className="decision-panel__time">
-        Diperbarui {clock(status.lastUpdated)} · simulasi 5 detik
+        Diperbarui {clock(status.lastUpdated)} ·{' '}
+        {simPlaying ? `simulasi ${simSpeed}×` : 'simulasi dijeda'}
       </p>
     </aside>
   );

@@ -10,8 +10,8 @@ import { priceSnapshot } from './prices.js';
 import type { LiveState, Selection, SelectionKind } from './types.js';
 
 const RIVER_NAMES: Record<string, string> = {
-  'ci-apus': 'Ci Apus',
-  ciapus: 'Ciapus',
+  cisadane: 'Sungai Cisadane',
+  cisindangbarang: 'Sungai Cisindangbarang',
 };
 
 export interface DecisionStatus {

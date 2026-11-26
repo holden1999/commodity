@@ -164,26 +164,82 @@ function buildContourGeometry() {
   return geometry;
 }
 
+/** Grid geometry that follows terrain elevation. */
+function buildGridGeometry() {
+  const spacing = 4;
+  const positions: number[] = [];
+  const halfW = MAP_WIDTH / 2;
+  const halfD = MAP_DEPTH / 2;
+  const steps = 60;
+
+  // Lines along X (east-west)
+  for (let z = -halfD; z <= halfD; z += spacing) {
+    for (let i = 0; i < steps; i += 1) {
+      const x1 = -halfW + (i / steps) * MAP_WIDTH;
+      const x2 = -halfW + ((i + 1) / steps) * MAP_WIDTH;
+      const y1 = terrainYAt(x1, z) + 0.06;
+      const y2 = terrainYAt(x2, z) + 0.06;
+      positions.push(x1, y1, z, x2, y2, z);
+    }
+  }
+
+  // Lines along Z (north-south)
+  for (let x = -halfW; x <= halfW; x += spacing) {
+    for (let i = 0; i < steps; i += 1) {
+      const z1 = -halfD + (i / steps) * MAP_DEPTH;
+      const z2 = -halfD + ((i + 1) / steps) * MAP_DEPTH;
+      const y1 = terrainYAt(x, z1) + 0.06;
+      const y2 = terrainYAt(x, z2) + 0.06;
+      positions.push(x, y1, z1, x, y2, z2);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  return geometry;
+}
+
 /** Terrain mesh from the real SRTM grid. */
-export function Terrain() {
+export function Terrain({ night = false }: { night?: boolean }) {
   const geometry = useMemo(() => buildTerrainGeometry(), []);
   const contours = useMemo(() => buildContourGeometry(), []);
+  const grid = useMemo(() => buildGridGeometry(), []);
 
   useEffect(
     () => () => {
       geometry.dispose();
       contours.dispose();
+      grid.dispose();
     },
-    [geometry, contours],
+    [geometry, contours, grid],
   );
 
   return (
     <>
       <mesh geometry={geometry} receiveShadow>
-        <meshLambertMaterial vertexColors />
+        <meshLambertMaterial
+          vertexColors
+          color={night ? '#4c687a' : '#ffffff'}
+        />
       </mesh>
       <lineSegments geometry={contours} raycast={() => {}}>
-        <lineBasicMaterial color="#3f5d37" transparent opacity={0.38} depthWrite={false} />
+        <lineBasicMaterial
+          color={night ? '#2c5368' : '#3f5d37'}
+          transparent
+          opacity={night ? 0.45 : 0.38}
+          depthWrite={false}
+        />
+      </lineSegments>
+      <lineSegments geometry={grid} raycast={() => {}}>
+        <lineBasicMaterial
+          color={night ? '#38bdf8' : '#4a6a3c'}
+          transparent
+          opacity={night ? 0.14 : 0.12}
+          depthWrite={false}
+        />
       </lineSegments>
     </>
   );

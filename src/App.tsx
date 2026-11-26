@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { Scene } from './scene/Scene.js';
 import { DecisionPanel } from './components/DecisionPanel.js';
 import { KpiPanel } from './components/KpiPanel.js';
+import { LiveControls } from './components/LiveControls.js';
 import { RantaiPasokPanel } from './components/RantaiPasokPanel.js';
 import { TopBar } from './components/TopBar.js';
 import {
@@ -28,24 +29,36 @@ export default function App() {
   const select = useAppStore((state) => state.select);
   const clearSelection = useAppStore((state) => state.clearSelection);
   const tick = useAppStore((state) => state.tick);
+  const syncSnapshot = useAppStore((state) => state.syncSnapshot);
   const live = useAppStore((state) => state.live);
+  const serverVisibility = useAppStore((state) => state.visibility);
   const filters = useAppStore((state) => state.filters);
   const focusZonaId = useAppStore((state) => state.focusZonaId);
   const focusNonce = useAppStore((state) => state.focusNonce);
+  const theme = useAppStore((state) => state.theme);
+  const cutaway = useAppStore((state) => state.cutaway);
+  const simPlaying = useAppStore((state) => state.simPlaying);
+  const simSpeed = useAppStore((state) => state.simSpeed);
+  const selectedRantaiId = useAppStore((state) => state.selectedRantaiId);
   const visibleRef = useRef<SceneVisibility | null>(null);
 
   const visible = useMemo(() => {
-    const next = buildSceneVisibility(filters, live);
+    const next = serverVisibility ?? buildSceneVisibility(filters, live);
     const previous = visibleRef.current;
     if (previous && sameVisibility(previous, next)) return previous;
     visibleRef.current = next;
     return next;
-  }, [filters, live]);
+  }, [serverVisibility, filters, live]);
 
   useEffect(() => {
-    const timer = window.setInterval(tick, 5000);
+    void syncSnapshot();
+  }, [syncSnapshot]);
+
+  useEffect(() => {
+    if (!simPlaying) return;
+    const timer = window.setInterval(tick, 5000 / simSpeed);
     return () => window.clearInterval(timer);
-  }, [tick]);
+  }, [tick, simPlaying, simSpeed]);
 
   useEffect(() => {
     if (selection && !isSelectionVisible(selection, visible)) {
@@ -54,7 +67,7 @@ export default function App() {
   }, [selection, visible, clearSelection]);
 
   return (
-    <div className="app">
+    <div className={`app${theme === 'night' ? ' app--night' : ''}`}>
       <Canvas
         className="scene-canvas"
         shadows="percentage"
@@ -68,8 +81,15 @@ export default function App() {
             selected={selection}
             onSelect={select}
             visible={visible}
+            live={live}
             focusZonaId={focusZonaId}
             focusNonce={focusNonce}
+            night={theme === 'night'}
+            cutaway={cutaway}
+            simPlaying={simPlaying}
+            simSpeed={simSpeed}
+            rantaiPasokType={filters.rantaiPasokType}
+            selectedRantaiId={selectedRantaiId}
           />
         ) : null}
       </Canvas>
@@ -78,8 +98,11 @@ export default function App() {
       <KpiPanel />
       <DecisionPanel />
       <RantaiPasokPanel />
+      <LiveControls />
 
-      <p className="hint">Click to inspect · Drag to pan · Scroll to zoom</p>
+      <p className="hint">
+        Click to inspect · Drag to pan · Right-drag to orbit · Scroll to zoom
+      </p>
     </div>
   );
 }

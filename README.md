@@ -43,12 +43,17 @@ src/                    React app, data, fuzzy logic, 3D scene
 src/data/               Desa, zona, petak, komoditas, harga seed
 src/scene/terrainData.ts SRTM elevation grid for the Ciapus bbox
 src/scene/mapData.ts    OSM waterways and roads
+src/logic/api.ts        Snapshot/tick client
+internal/api/           Go HTTP API
+internal/dss/           Go decision engine
 internal/web/           Go embed handler for the Vite build
 cmd/server/             HTTP server
 ```
 
-The Go server has no API, database, or legacy diorama. It serves the built web
-app and falls back to `index.html` for client routes.
+The Go server serves the built web app, a small DSS API
+(`/api/snapshot`, `/api/live/tick`), and falls back to `index.html` for client
+routes. It has no database or legacy diorama. The live dock pauses/resumes the
+simulation, changes speed, and toggles night and cutaway modes.
 
 ## Checks
 

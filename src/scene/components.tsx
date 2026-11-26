@@ -11,7 +11,7 @@ import type {
   ZoneSegment,
 } from './layout.js';
 import { PASAR_POSITION, TREE_POSITIONS } from './layout.js';
-import { terrainYAt } from './terrainField.js';
+import { terrainYAt, WORLD_UNITS_PER_METER } from './terrainField.js';
 import { MapLabel } from './MapLabel.js';
 
 const SOIL = '#8a6a44';
@@ -298,6 +298,7 @@ export function ZonaTerrace({
       <MapLabel
         position={[placement.centerX, labelY, placement.centerZ]}
         tone="zone"
+        icon="zone"
       >
         <span>{placement.zona.nama}</span>
         <small>
@@ -398,8 +399,9 @@ export function PetakSurfaces({ rows }: { rows: readonly PetakSurfaceRow[] }) {
 export function PetakPlot({
   placement,
   selected,
+  lowWater = false,
   onSelect,
-}: { placement: PetakPlacement } & SelectableProps) {
+}: { placement: PetakPlacement; lowWater?: boolean } & SelectableProps) {
   return (
     <group
       position={[placement.x, placement.topY, placement.z]}
@@ -409,13 +411,31 @@ export function PetakPlot({
         <boxGeometry args={[placement.width, 0.3, placement.depth]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
+      {lowWater ? (
+        <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, 0]} raycast={() => {}}>
+          <ringGeometry
+            args={[
+              Math.min(placement.width, placement.depth) * 0.36,
+              Math.min(placement.width, placement.depth) * 0.44,
+              24,
+            ]}
+          />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={0.85} depthWrite={false} />
+        </mesh>
+      ) : null}
       {selected ? (
-        <SelectionOutline
-          width={placement.width}
-          depth={placement.depth}
-          height={0.55}
-          y={0.28}
-        />
+        <>
+          <SelectionOutline
+            width={placement.width}
+            depth={placement.depth}
+            height={0.55}
+            y={0.28}
+          />
+          <MapLabel position={[0, 0.95, 0]} tone="crop" icon="crop">
+            <span>{placement.petak.nama}</span>
+            <small>{placement.petak.luasHa} ha</small>
+          </MapLabel>
+        </>
       ) : null}
     </group>
   );
@@ -436,10 +456,11 @@ export function KolamPond({
   offsetX?: number;
   compact?: boolean;
 } & SelectableProps) {
+  // 1:100 scale aligned with terrain (~0.045 world units/meter, readable floor).
   const width = clamp(
-    Math.sqrt(kolam.luasM2) / 6,
-    3.4,
-    compact ? 3.8 : 5.0,
+    Math.sqrt(kolam.luasM2) * WORLD_UNITS_PER_METER * 1.4,
+    1.15,
+    compact ? 1.75 : 2.3,
   );
   const depth = width * 0.68;
   const waterColor = WATER_COLORS[kolam.tipe] ?? '#3b9dcc';
@@ -449,12 +470,12 @@ export function KolamPond({
       position={[placement.x + offsetX, placement.topY, placement.z]}
       onClick={(event) => selectObject(event, onSelect)}
     >
-      <mesh position={[0, 0.175, 0]} receiveShadow>
-        <boxGeometry args={[width + 0.8, 0.35, depth + 0.8]} />
+      <mesh position={[0, 0.1, 0]} receiveShadow>
+        <boxGeometry args={[width + 0.36, 0.2, depth + 0.36]} />
         <meshStandardMaterial color={SOIL} roughness={1} flatShading />
       </mesh>
-      <mesh position={[0, 0.37, 0]} receiveShadow>
-        <boxGeometry args={[width, 0.12, depth]} />
+      <mesh position={[0, 0.21, 0]} receiveShadow>
+        <boxGeometry args={[width, 0.08, depth]} />
         <meshStandardMaterial
           color={waterColor}
           roughness={0.2}
@@ -463,32 +484,32 @@ export function KolamPond({
           opacity={0.93}
         />
       </mesh>
-      <mesh position={[0, 0.44, 0]} rotation-x={-Math.PI / 2}>
+      <mesh position={[0, 0.255, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[width * 0.82, depth * 0.82]} />
         <meshStandardMaterial color="#8fd3ea" transparent opacity={0.28} />
       </mesh>
 
-      <group position={[0, 0.45, 0]}>
-        <mesh position={[0, 0.32, 0]}>
-          <cylinderGeometry args={[0.05, 0.07, 0.65, 6]} />
+      <group position={[0, 0.26, 0]}>
+        <mesh position={[0, 0.16, 0]}>
+          <cylinderGeometry args={[0.03, 0.04, 0.32, 6]} />
           <meshStandardMaterial color="#d8d2bd" roughness={0.8} />
         </mesh>
-        <mesh position={[0, 0.66, 0]} rotation-x={Math.PI / 2}>
-          <torusGeometry args={[0.4, 0.055, 6, 12]} />
+        <mesh position={[0, 0.33, 0]} rotation-x={Math.PI / 2}>
+          <torusGeometry args={[0.2, 0.03, 6, 12]} />
           <meshStandardMaterial color="#d8d2bd" roughness={0.8} />
         </mesh>
       </group>
 
-      <MapLabel position={[0, 1.35, 0]} tone="water">
+      <MapLabel position={[0, 0.85, 0]} tone="water" icon="fish">
         <span>{komoditas.nama}</span>
         <small>{kolam.tipe}</small>
       </MapLabel>
       {selected ? (
         <SelectionOutline
-          width={width + 1}
-          depth={depth + 1}
-          height={1.1}
-          y={0.55}
+          width={width + 0.5}
+          depth={depth + 0.5}
+          height={0.65}
+          y={0.325}
         />
       ) : null}
     </group>
@@ -501,6 +522,8 @@ export function KandangPen({
   placement,
   offsetX = 0,
   compact = false,
+  cutaway = false,
+  night = false,
   selected,
   onSelect,
 }: {
@@ -509,11 +532,14 @@ export function KandangPen({
   placement: PetakPlacement;
   offsetX?: number;
   compact?: boolean;
+  cutaway?: boolean;
+  night?: boolean;
 } & SelectableProps) {
+  // 1:100 scale aligned with terrain (~0.045 world units/meter).
   const width = clamp(
-    Math.sqrt(ternak.jumlah) * 0.42,
-    compact ? 2.8 : 3.2,
-    compact ? 3.4 : 4.6,
+    Math.sqrt(ternak.jumlah) * 0.14,
+    compact ? 1.3 : 1.5,
+    compact ? 1.7 : 2.2,
   );
   const depth = width * 0.72;
   const animalColor = ANIMAL_COLORS[ternak.jenis] ?? LIVESTOCK;
@@ -526,15 +552,15 @@ export function KandangPen({
       [-width / 2, depth / 2],
       [width / 2, depth / 2],
     ].map(([x, z]) => ({
-      position: [x ?? 0, 0.46, z ?? 0],
-      scale: [0.11, 0.75, 0.11],
+      position: [x ?? 0, 0.24, z ?? 0],
+      scale: [0.06, 0.38, 0.06],
     }));
 
     const rails: InstanceItem[] = [
-      { position: [0, 0.45, depth / 2], scale: [width, 0.07, 0.07] },
-      { position: [0, 0.45, -depth / 2], scale: [width, 0.07, 0.07] },
-      { position: [width / 2, 0.45, 0], scale: [0.07, 0.07, depth] },
-      { position: [-width / 2, 0.45, 0], scale: [0.07, 0.07, depth] },
+      { position: [0, 0.24, depth / 2], scale: [width, 0.04, 0.04] },
+      { position: [0, 0.24, -depth / 2], scale: [width, 0.04, 0.04] },
+      { position: [width / 2, 0.24, 0], scale: [0.04, 0.04, depth] },
+      { position: [-width / 2, 0.24, 0], scale: [0.04, 0.04, depth] },
     ];
 
     const animalPositions: [number, number][] = [
@@ -549,13 +575,13 @@ export function KandangPen({
     for (let index = 0; index < animals; index += 1) {
       const [x, z] = animalPositions[index] ?? [0, 0];
       bodies.push({
-        position: [x, 0.3, z],
-        scale: [0.48, 0.28, 0.3],
+        position: [x, 0.16, z],
+        scale: [0.24, 0.14, 0.16],
         color: animalColor,
       });
       heads.push({
-        position: [x + 0.3, 0.38, z],
-        scale: [0.2, 0.2, 0.2],
+        position: [x + 0.15, 0.21, z],
+        scale: [0.1, 0.1, 0.1],
         color: animalColor,
       });
     }
@@ -568,8 +594,8 @@ export function KandangPen({
       position={[placement.x + offsetX, placement.topY, placement.z]}
       onClick={(event) => selectObject(event, onSelect)}
     >
-      <mesh position={[0, 0.09, 0]} receiveShadow>
-        <boxGeometry args={[width, 0.18, depth]} />
+      <mesh position={[0, 0.05, 0]} receiveShadow>
+        <boxGeometry args={[width, 0.1, depth]} />
         <meshStandardMaterial color={LIVESTOCK} roughness={1} flatShading />
       </mesh>
 
@@ -591,17 +617,30 @@ export function KandangPen({
       </Instances>
 
       <group position={[0, 0, -depth * 0.12]}>
-        <mesh position={[0, 0.48, 0]} castShadow>
-          <boxGeometry args={[width * 0.42, 0.62, depth * 0.38]} />
-          <meshStandardMaterial color="#b98a5a" roughness={1} flatShading />
+        <mesh position={[0, cutaway ? 0.14 : 0.26, 0]} castShadow>
+          <boxGeometry args={[width * 0.42, cutaway ? 0.16 : 0.34, depth * 0.38]} />
+          <meshStandardMaterial
+            color="#b98a5a"
+            emissive={night ? '#f59e0b' : '#000000'}
+            emissiveIntensity={night ? 0.22 : 0}
+            roughness={1}
+            flatShading
+          />
         </mesh>
-        <mesh position={[0, 0.95, 0]} rotation-y={Math.PI / 4} castShadow>
-          <coneGeometry args={[width * 0.36, 0.42, 4]} />
-          <meshStandardMaterial color="#9c5b3f" roughness={1} flatShading />
-        </mesh>
+        {!cutaway ? (
+          <mesh position={[0, 0.52, 0]} rotation-y={Math.PI / 4} castShadow>
+            <coneGeometry args={[width * 0.36, 0.24, 4]} />
+            <meshStandardMaterial color="#9c5b3f" roughness={1} flatShading />
+          </mesh>
+        ) : (
+          <mesh position={[0, 0.23, 0]} raycast={() => {}}>
+            <boxGeometry args={[width * 0.26, 0.05, depth * 0.2]} />
+            <meshStandardMaterial color="#e0b354" roughness={0.8} />
+          </mesh>
+        )}
       </group>
 
-      <MapLabel position={[0, 1.65, 0]} tone="livestock">
+      <MapLabel position={[0, 1.0, 0]} tone="livestock" icon="livestock">
         <span>Kandang {ternak.jenis}</span>
         <small>
           {ternak.jumlah} ekor · {komoditas.nama}
@@ -609,10 +648,10 @@ export function KandangPen({
       </MapLabel>
       {selected ? (
         <SelectionOutline
-          width={width + 0.5}
-          depth={depth + 0.5}
-          height={1.5}
-          y={0.75}
+          width={width + 0.3}
+          depth={depth + 0.3}
+          height={0.85}
+          y={0.425}
         />
       ) : null}
     </group>
@@ -620,16 +659,18 @@ export function KandangPen({
 }
 
 const MARKET_STALLS = [
-  { x: -2.1, z: -1.5, color: '#b74b3f' },
-  { x: 0.1, z: 1.3, color: '#3f7d4f' },
-  { x: 2.2, z: -1.4, color: '#c99a35' },
+  { x: -1.0, z: -0.7, color: '#b74b3f' },
+  { x: 0.05, z: 0.62, color: '#3f7d4f' },
+  { x: 1.05, z: -0.65, color: '#c99a35' },
 ] as const;
 
 export function Pasar({
   topY,
+  cutaway = false,
+  night = false,
   selected,
   onSelect,
-}: { topY: number } & SelectableProps) {
+}: { topY: number; cutaway?: boolean; night?: boolean } & SelectableProps) {
   const decor = useMemo(() => {
     const stalls: InstanceItem[] = [];
     const posts: InstanceItem[] = [];
@@ -638,40 +679,40 @@ export function Pasar({
 
     for (const stall of MARKET_STALLS) {
       stalls.push({
-        position: [stall.x, 0.59, stall.z],
-        scale: [2.3, 0.55, 1.2],
+        position: [stall.x, 0.3, stall.z],
+        scale: [1.1, 0.28, 0.58],
       });
 
       for (const [x, z] of [
-        [-1.1, -0.55],
-        [1.1, -0.55],
-        [-1.1, 0.55],
-        [1.1, 0.55],
+        [-0.52, -0.26],
+        [0.52, -0.26],
+        [-0.52, 0.26],
+        [0.52, 0.26],
       ]) {
         posts.push({
-          position: [stall.x + (x ?? 0), 1.02, stall.z + (z ?? 0)],
-          scale: [0.08, 1.7, 0.08],
+          position: [stall.x + (x ?? 0), 0.52, stall.z + (z ?? 0)],
+          scale: [0.05, 0.85, 0.05],
         });
       }
 
       for (let stripe = 0; stripe < 5; stripe += 1) {
         stripes.push({
-          position: [stall.x - 1 + stripe * 0.5, 1.89, stall.z],
-          scale: [0.5, 0.12, 1.55],
+          position: [stall.x - 0.48 + stripe * 0.24, 0.94, stall.z],
+          scale: [0.24, 0.06, 0.75],
           color: stripe % 2 === 0 ? stall.color : '#f1e6cf',
         });
       }
     }
 
     for (const [x, z] of [
-      [-2.8, 2.2],
-      [2.8, 2.2],
-      [-2.8, -2.2],
-      [2.8, -2.2],
+      [-1.3, 1.05],
+      [1.3, 1.05],
+      [-1.3, -1.05],
+      [1.3, -1.05],
     ]) {
       crates.push({
-        position: [x ?? 0, 0.26, z ?? 0],
-        scale: [0.65, 0.4, 0.5],
+        position: [x ?? 0, 0.14, z ?? 0],
+        scale: [0.32, 0.2, 0.24],
       });
     }
 
@@ -683,38 +724,49 @@ export function Pasar({
       position={[PASAR_POSITION.x, topY, PASAR_POSITION.z]}
       onClick={(event) => selectObject(event, onSelect)}
     >
-      <mesh position={[0, -0.225, 0]} receiveShadow>
-        <boxGeometry args={[7.6, 0.45, 7.0]} />
+      <mesh position={[0, -0.12, 0]} receiveShadow>
+        <boxGeometry args={[3.6, 0.24, 3.3]} />
         <meshStandardMaterial color="#cbb98f" roughness={1} flatShading />
       </mesh>
-      <mesh position={[0, 0.03, 0]} receiveShadow>
-        <boxGeometry args={[7.2, 0.08, 6.6]} />
+      <mesh position={[0, 0.02, 0]} receiveShadow>
+        <boxGeometry args={[3.4, 0.05, 3.1]} />
         <meshStandardMaterial color="#d9c7a3" roughness={1} />
       </mesh>
 
       <Instances items={decor.stalls} castShadow>
         <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#c9a86f" roughness={1} flatShading />
+        <meshStandardMaterial
+          color="#c9a86f"
+          emissive={night ? '#f59e0b' : '#000000'}
+          emissiveIntensity={night ? 0.18 : 0}
+          roughness={1}
+          flatShading
+        />
       </Instances>
       <Instances items={decor.posts}>
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color="#7b5a3c" roughness={1} />
       </Instances>
-      <Instances items={decor.stripes}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.9} />
-      </Instances>
+      {!cutaway ? (
+        <Instances items={decor.stripes}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.9} />
+        </Instances>
+      ) : null}
       <Instances items={decor.crates}>
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color="#a97b4a" roughness={1} flatShading />
       </Instances>
+      {night ? (
+        <pointLight position={[0, 1.5, 0]} color="#fbbf24" intensity={4.5} distance={14} decay={2} />
+      ) : null}
 
-      <MapLabel position={[0, 2.4, 0]} tone="market">
+      <MapLabel position={[0, 1.35, 0]} tone="market" icon="market">
         <span>Pasar Desa Ciapus</span>
         <small>B2B · B2C</small>
       </MapLabel>
       {selected ? (
-        <SelectionOutline width={8.2} depth={7.6} height={2.8} y={1.4} />
+        <SelectionOutline width={3.9} depth={3.6} height={1.45} y={0.725} />
       ) : null}
     </group>
   );
@@ -844,7 +896,7 @@ export function River({
         />
       </mesh>
       {spec.showLabel ? (
-        <MapLabel position={[spec.label[0], labelY, spec.label[1]]} tone="water">
+        <MapLabel position={[spec.label[0], labelY, spec.label[1]]} tone="water" icon="water">
           {spec.nama}
         </MapLabel>
       ) : null}
@@ -854,7 +906,7 @@ export function River({
 
 export function Road({ spec }: { spec: MapRoad }) {
   const geometry = useMemo(
-    () => ribbonGeometry(spec.points, spec.width, terrainYAt, 0.04),
+    () => ribbonGeometry(spec.points, spec.width * 0.52, terrainYAt, 0.04),
     [spec],
   );
 
@@ -871,13 +923,13 @@ const TREE_LAYERS = TREE_POSITIONS.map(([x, z], index) => {
   const green = index % 2 === 0 ? '#4f8a45' : '#5d9c4f';
   const base = terrainYAt(x, z);
   return {
-    trunk: { position: [x, base + 0.55, z] as [number, number, number] },
+    trunk: { position: [x, base + 0.26, z] as [number, number, number] },
     lower: {
-      position: [x, base + 1.45, z] as [number, number, number],
+      position: [x, base + 0.68, z] as [number, number, number],
       color: green,
     },
     upper: {
-      position: [x, base + 2.05, z] as [number, number, number],
+      position: [x, base + 0.96, z] as [number, number, number],
       color: shade(green, 0.08),
     },
   };
@@ -891,15 +943,15 @@ export function Trees() {
   return (
     <>
       <Instances items={TREE_TRUNKS}>
-        <cylinderGeometry args={[0.14, 0.22, 1.1, 6]} />
+        <cylinderGeometry args={[0.06, 0.1, 0.52, 6]} />
         <meshStandardMaterial color="#7b5a3c" roughness={1} flatShading />
       </Instances>
       <Instances items={TREE_LOWER} castShadow>
-        <coneGeometry args={[0.82, 1.25, 6]} />
+        <coneGeometry args={[0.36, 0.58, 6]} />
         <meshStandardMaterial color="#ffffff" roughness={1} flatShading />
       </Instances>
       <Instances items={TREE_UPPER} castShadow>
-        <coneGeometry args={[0.58, 0.9, 6]} />
+        <coneGeometry args={[0.25, 0.42, 6]} />
         <meshStandardMaterial color="#ffffff" roughness={1} flatShading />
       </Instances>
     </>

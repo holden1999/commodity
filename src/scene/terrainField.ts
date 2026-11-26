@@ -4,6 +4,8 @@ import { TERRAIN_BOUNDS, TERRAIN_ELEVATION } from './terrainData.js';
 export const MAP_WIDTH = 84;
 export const MAP_DEPTH = 72;
 export const TARGET_Y = 4;
+/** 1:100 landscape scale: 84 world units ≈ 1,859 m (~0.045 world units/meter). */
+export const WORLD_UNITS_PER_METER = 0.045;
 
 /** One DEM sample per 100-column grid; tuned for a 1:100 landscape read. */
 export const TERRAIN_COLS = TERRAIN_BOUNDS.cols;

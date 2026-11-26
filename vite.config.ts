@@ -7,6 +7,9 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5178,
     strictPort: true,
+    proxy: {
+      '/api': 'http://127.0.0.1:8090',
+    },
   },
   build: {
     outDir: 'internal/web/dist',

@@ -3,12 +3,11 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { MAP_DEPTH, MAP_WIDTH, TARGET_Y } from './terrainField.js';
 
-const CAMERA_OFFSET = new THREE.Vector3(1, 1.15, 1).normalize().multiplyScalar(90);
-const ELEVATION = Math.atan2(
-  CAMERA_OFFSET.y,
-  Math.hypot(CAMERA_OFFSET.x, CAMERA_OFFSET.z),
-);
-const COS_ELEVATION = Math.cos(ELEVATION);
+const CAMERA_RADIUS = 90;
+const DEFAULT_AZIMUTH = Math.PI / 4;
+const DEFAULT_ELEVATION = Math.atan2(1.15, Math.SQRT2);
+const MIN_ELEVATION = 0.38;
+const MAX_ELEVATION = 1.25;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -27,8 +26,8 @@ interface CameraRigProps {
 }
 
 /**
- * Orthographic strategy camera. Left-drag pans, the wheel zooms, and the
- * target stays near the map. A zona selection drives a smooth focus move.
+ * Orthographic strategy camera. Left-drag pans, right-drag (or Shift+drag)
+ * tilts and rotates, wheel zooms, and target stays clamped inside map bounds.
  */
 export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
   const { camera, gl, size } = useThree();
@@ -38,6 +37,11 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
   const minZoom = useRef(1);
   const maxZoom = useRef(4);
   const homeZoom = useRef(2);
+  const azimuthGoal = useRef(DEFAULT_AZIMUTH);
+  const azimuthCurrent = useRef(DEFAULT_AZIMUTH);
+  const elevationGoal = useRef(DEFAULT_ELEVATION);
+  const elevationCurrent = useRef(DEFAULT_ELEVATION);
+  const offsetVec = useRef(new THREE.Vector3());
   const initialized = useRef(false);
   const focusRef = useRef(focusTarget);
   const sizeRef = useRef(size);
@@ -63,10 +67,10 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     const fitZoom =
       Math.min(
         viewWidth / MAP_WIDTH,
-        viewHeight / (MAP_DEPTH * COS_ELEVATION),
+        viewHeight / (MAP_DEPTH * Math.cos(DEFAULT_ELEVATION)),
       ) * 1.02;
     minZoom.current = Math.max(0.6, fitZoom);
-    maxZoom.current = Math.max(minZoom.current + 1, minZoom.current * 3.5);
+    maxZoom.current = Math.max(minZoom.current + 1, minZoom.current * 3.8);
     homeZoom.current = minZoom.current;
 
     if (!initialized.current) {
@@ -101,33 +105,57 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
       target.zoom === 'zone'
         ? clamp(zoneZoom, minZoom.current, maxZoom.current)
         : homeZoom.current;
+    if (target.zoom === 'home') {
+      azimuthGoal.current = DEFAULT_AZIMUTH;
+      elevationGoal.current = DEFAULT_ELEVATION;
+    }
     clampGoal();
   }, [focusNonce, size.width, size.height]);
 
   useEffect(() => {
     const dom = gl.domElement;
-    let dragging = false;
+    let mode: 'none' | 'pan' | 'orbit' = 'none';
     let lastX = 0;
     let lastY = 0;
     let pointerId = -1;
 
+    const onContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
     const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0) return;
-      dragging = true;
+      if (event.button === 2 || (event.button === 0 && event.shiftKey)) {
+        mode = 'orbit';
+      } else if (event.button === 0) {
+        mode = 'pan';
+      } else {
+        return;
+      }
       lastX = event.clientX;
       lastY = event.clientY;
       pointerId = event.pointerId;
       dom.setPointerCapture(event.pointerId);
-      dom.style.cursor = 'grabbing';
+      dom.style.cursor = mode === 'orbit' ? 'move' : 'grabbing';
       event.preventDefault();
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      if (!dragging) return;
+      if (mode === 'none') return;
       const dx = event.clientX - lastX;
       const dy = event.clientY - lastY;
       lastX = event.clientX;
       lastY = event.clientY;
+
+      if (mode === 'orbit') {
+        azimuthGoal.current -= dx * 0.006;
+        elevationGoal.current = clamp(
+          elevationGoal.current + dy * 0.005,
+          MIN_ELEVATION,
+          MAX_ELEVATION,
+        );
+        event.preventDefault();
+        return;
+      }
 
       const cam = camera as THREE.OrthographicCamera;
       const viewportHeight = Math.max(1, sizeRef.current.height);
@@ -141,15 +169,16 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
         .setY(0)
         .normalize();
 
+      const cosEl = Math.max(0.25, Math.cos(elevationCurrent.current));
       goal.current.addScaledVector(right, -dx * worldPerPixel);
-      goal.current.addScaledVector(up, (dy * worldPerPixel) / COS_ELEVATION);
+      goal.current.addScaledVector(up, (dy * worldPerPixel) / cosEl);
       clampGoal();
       event.preventDefault();
     };
 
     const endDrag = (event: PointerEvent) => {
-      if (!dragging) return;
-      dragging = false;
+      if (mode === 'none') return;
+      mode = 'none';
       if (pointerId >= 0 && dom.hasPointerCapture(pointerId)) {
         dom.releasePointerCapture(pointerId);
       }
@@ -167,6 +196,7 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
 
     dom.style.cursor = 'grab';
     dom.style.touchAction = 'none';
+    dom.addEventListener('contextmenu', onContextMenu);
     dom.addEventListener('pointerdown', onPointerDown);
     dom.addEventListener('pointermove', onPointerMove);
     dom.addEventListener('pointerup', endDrag);
@@ -174,6 +204,7 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     dom.addEventListener('wheel', onWheel, { passive: false });
 
     return () => {
+      dom.removeEventListener('contextmenu', onContextMenu);
       dom.removeEventListener('pointerdown', onPointerDown);
       dom.removeEventListener('pointermove', onPointerMove);
       dom.removeEventListener('pointerup', endDrag);
@@ -198,12 +229,31 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     const damping = 1 - Math.exp(-12 * Math.min(delta, 0.1));
     clampGoal();
     current.current.lerp(goal.current, damping);
+    azimuthCurrent.current = THREE.MathUtils.lerp(
+      azimuthCurrent.current,
+      azimuthGoal.current,
+      damping,
+    );
+    elevationCurrent.current = THREE.MathUtils.lerp(
+      elevationCurrent.current,
+      elevationGoal.current,
+      damping,
+    );
+
     const nextZoom = THREE.MathUtils.lerp(cam.zoom, zoomGoal.current, damping);
     if (Math.abs(nextZoom - cam.zoom) > 0.0001) {
       cam.zoom = nextZoom;
       cam.updateProjectionMatrix();
     }
-    cam.position.copy(current.current).add(CAMERA_OFFSET);
+
+    const horiz = CAMERA_RADIUS * Math.cos(elevationCurrent.current);
+    offsetVec.current.set(
+      horiz * Math.sin(azimuthCurrent.current),
+      CAMERA_RADIUS * Math.sin(elevationCurrent.current),
+      horiz * Math.cos(azimuthCurrent.current),
+    );
+
+    cam.position.copy(current.current).add(offsetVec.current);
     cam.lookAt(current.current);
     cam.updateMatrixWorld();
   });

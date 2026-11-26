@@ -4,9 +4,12 @@ import { useAppStore } from '../store/useAppStore.js';
 
 export const RantaiPasokPanel = memo(function RantaiPasokPanel() {
   const filters = useAppStore((state) => state.filters);
+  const serverRows = useAppStore((state) => state.rantaiPasok);
+  const selectedRantaiId = useAppStore((state) => state.selectedRantaiId);
+  const selectRantai = useAppStore((state) => state.selectRantai);
   const rows = useMemo(
-    () => selectRantaiPasok(filters.rantaiPasokType),
-    [filters.rantaiPasokType],
+    () => serverRows ?? selectRantaiPasok(filters.rantaiPasokType),
+    [serverRows, filters.rantaiPasokType],
   );
 
   return (
@@ -27,7 +30,19 @@ export const RantaiPasokPanel = memo(function RantaiPasokPanel() {
         {rows.map((row) => (
           <li
             key={row.id}
-            className={`chain-row chain-row--${row.tipe.toLowerCase()}`}
+            className={`chain-row chain-row--${row.tipe.toLowerCase()}${
+              selectedRantaiId === row.id ? ' is-selected' : ''
+            }`}
+            role="button"
+            tabIndex={0}
+            aria-pressed={selectedRantaiId === row.id}
+            onClick={() => selectRantai(row.id)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectRantai(row.id);
+              }
+            }}
           >
             <p className="chain-row__route">
               {row.dariNama} <span aria-hidden="true">→</span> {row.keNama}

@@ -95,15 +95,101 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.live-dock {
+  position: absolute;
+  right: 22px;
+  bottom: 58px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(194, 225, 186, 0.24);
+  border-radius: 10px;
+  background: rgba(13, 43, 28, 0.86);
+  color: #ecfbe6;
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 8px 22px rgba(15, 34, 18, 0.18);
+}
+
+.live-dock button {
+  padding: 5px 7px;
+  border: 1px solid rgba(194, 225, 186, 0.18);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.live-dock button:hover,
+.live-dock button.is-active {
+  border-color: rgba(103, 232, 249, 0.55);
+  background: rgba(103, 232, 249, 0.12);
+}
+
+.live-dock__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 4px;
+  color: #b7d7b0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-dock__status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8a9b84;
+}
+
+.live-dock__status.is-live i {
+  background: #78d466;
+  box-shadow: 0 0 0 3px rgba(120, 212, 102, 0.18);
+  animation: live-pulse 1.8s ease-out infinite;
+}
+
+.live-dock__speeds {
+  display: flex;
+  gap: 2px;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(120, 212, 102, 0.16);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(120, 212, 102, 0.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dock__status.is-live i {
+    animation: none;
+  }
+}
+
+.app--night .hint {
+  border-color: rgba(148, 190, 220, 0.18);
+  background: rgba(13, 27, 38, 0.8);
+  color: #d9ecff;
+}
+
 .map-label-wrapper {
   z-index: 5 !important;
 }
 
 .map-label {
-  padding: 3px 6px;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 7px;
   border: 1px solid rgba(208, 236, 200, 0.32);
   border-radius: 6px;
-  background: rgba(13, 43, 28, 0.82);
+  background: rgba(13, 43, 28, 0.84);
   color: #f5fff1;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -112,9 +198,19 @@ body {
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1.2;
-  text-align: center;
+  text-align: left;
   white-space: nowrap;
   box-shadow: 0 3px 10px rgba(15, 34, 18, 0.2);
+}
+
+.map-label__icon {
+  flex: 0 0 auto;
+  opacity: 0.92;
+}
+
+.map-label__text {
+  display: flex;
+  flex-direction: column;
 }
 
 .map-label span {
@@ -699,6 +795,17 @@ body {
   border-left: 3px solid #8a5a36;
   border-radius: 5px;
   background: #fffdf5;
+  cursor: pointer;
+}
+
+.chain-row:hover,
+.chain-row.is-selected {
+  background: #eef7e7;
+  box-shadow: inset 0 0 0 1px rgba(79, 143, 58, 0.25);
+}
+
+.chain-row.is-selected {
+  border-left-color: #67e8f9;
 }
 
 .chain-row--b2c {

@@ -7,7 +7,8 @@ const signedPct = (value: number | null) =>
 
 export function KpiPanel() {
   const live = useAppStore((state) => state.live);
-  const kpi = useMemo(() => buildKpi(live), [live]);
+  const serverKpi = useAppStore((state) => state.kpi);
+  const kpi = useMemo(() => serverKpi ?? buildKpi(live), [serverKpi, live]);
 
   const cards = [
     {
