@@ -91,6 +91,7 @@ function buildZoneCells(zones: readonly Zona[]) {
 
       const segments = boundaries.get(zoneId) ?? [];
       const add = (nx: number, nz: number, segment: ZoneSegment) => {
+        if (nx < 0 || nx >= ZONE_COLS || nz < 0 || nz >= ZONE_ROWS) return;
         if (cellZone.get(`${nx},${nz}`) !== zoneId) segments.push(segment);
       };
 

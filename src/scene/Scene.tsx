@@ -5,7 +5,7 @@ import type { SceneVisibility } from '../logic/filters.js';
 import type { Selection } from '../logic/types.js';
 import { ROADS, RIVERS } from './mapData.js';
 import { buildLayout, PASAR_POSITION } from './layout.js';
-import { MAP_WIDTH, TARGET_Y, terrainYAt } from './terrainField.js';
+import { MAP_WIDTH, TARGET_Y, MAP_BACKGROUND, terrainYAt } from './terrainField.js';
 import { Terrain } from './terrain.js';
 import { CameraRig } from './CameraRig.js';
 import {
@@ -69,8 +69,8 @@ export function Scene({
 
   return (
     <>
-      <color attach="background" args={['#e8f2e3']} />
-      <fog attach="fog" args={['#e8f2e3', 95, 190]} />
+      <color attach="background" args={[MAP_BACKGROUND]} />
+      <fog attach="fog" args={[MAP_BACKGROUND, 95, 190]} />
 
       <OrthographicCamera
         makeDefault

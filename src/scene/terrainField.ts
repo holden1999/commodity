@@ -14,6 +14,7 @@ export const TERRAIN_SEGMENTS_Z = TERRAIN_ROWS - 1;
 export const TERRAIN_MIN_MDPL = Math.min(...TERRAIN_ELEVATION);
 export const TERRAIN_MAX_MDPL = Math.max(...TERRAIN_ELEVATION);
 export const TERRAIN_Y_MAX = 10;
+export const MAP_BACKGROUND = '#e8f2e3';
 
 /**
  * The DEM grid covers 205-262 mdpl, while the seed zone bands span 200-325.

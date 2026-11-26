@@ -773,17 +773,19 @@ export function River({
   selected,
   onSelect,
 }: { spec: MapRiver } & SelectableProps) {
+  // 1:100 display width; OSM width is not a survey width.
+  const width = spec.width * 0.34;
   const bank = useMemo(
-    () => ribbonGeometry(spec.points, spec.width + 1.7, terrainYAt, 0.12),
-    [spec],
+    () => ribbonGeometry(spec.points, width + 0.55, terrainYAt, 0.12),
+    [spec, width],
   );
   const water = useMemo(
-    () => ribbonGeometry(spec.points, spec.width, terrainYAt, 0.2),
-    [spec],
+    () => ribbonGeometry(spec.points, width, terrainYAt, 0.2),
+    [spec, width],
   );
   const outline = useMemo(
-    () => ribbonGeometry(spec.points, spec.width + 1.2, terrainYAt, 0.28),
-    [spec],
+    () => ribbonGeometry(spec.points, width + 0.35, terrainYAt, 0.28),
+    [spec, width],
   );
 
   useEffect(

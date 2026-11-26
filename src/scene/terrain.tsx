@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import {
+  MAP_BACKGROUND,
   MAP_DEPTH,
   MAP_WIDTH,
   TERRAIN_MAX_MDPL,
@@ -64,6 +65,26 @@ function buildTerrainGeometry() {
     colors[index * 3 + 1] = (colors[index * 3 + 1] ?? 0) * shade;
     colors[index * 3 + 2] = (colors[index * 3 + 2] ?? 0) * shade;
   }
+
+  const background = new THREE.Color(MAP_BACKGROUND);
+  const fadeWidth = 8;
+  const edgeColor = new THREE.Color();
+  for (let index = 0; index < positions.count; index += 1) {
+    const edge = Math.min(
+      MAP_WIDTH / 2 - Math.abs(positions.getX(index)),
+      MAP_DEPTH / 2 - Math.abs(positions.getZ(index)),
+    );
+    const opacity = clamp(edge / fadeWidth, 0, 1);
+    edgeColor
+      .setRGB(
+        colors[index * 3] ?? 0,
+        colors[index * 3 + 1] ?? 0,
+        colors[index * 3 + 2] ?? 0,
+      )
+      .lerp(background, 1 - opacity);
+    edgeColor.toArray(colors, index * 3);
+  }
+
   geometry.attributes.color.needsUpdate = true;
   return geometry;
 }

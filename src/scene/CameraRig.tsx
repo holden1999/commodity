@@ -9,8 +9,6 @@ const ELEVATION = Math.atan2(
   Math.hypot(CAMERA_OFFSET.x, CAMERA_OFFSET.z),
 );
 const COS_ELEVATION = Math.cos(ELEVATION);
-const RIGHT_GROUND = new THREE.Vector3(1, 0, -1).normalize();
-const UP_GROUND = new THREE.Vector3(-1, 0, -1).normalize();
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -79,34 +77,13 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     }
   }, [camera, size.width, size.height]);
 
-  const limits = (zoom: number): { x: number; z: number } | null => {
-    const cam = camera as THREE.OrthographicCamera;
-    if (
-      !Number.isFinite(cam.left) ||
-      !Number.isFinite(cam.right) ||
-      !Number.isFinite(cam.top) ||
-      !Number.isFinite(cam.bottom) ||
-      !Number.isFinite(zoom) ||
-      zoom <= 0
-    ) {
-      return null;
-    }
-
-    const halfWidth = (cam.right - cam.left) / (2 * zoom);
-    const halfHeight = (cam.top - cam.bottom) / (2 * zoom * COS_ELEVATION);
-    const halfX =
-      Math.abs(RIGHT_GROUND.x) * halfWidth + Math.abs(UP_GROUND.x) * halfHeight;
-    const halfZ =
-      Math.abs(RIGHT_GROUND.z) * halfWidth + Math.abs(UP_GROUND.z) * halfHeight;
-    return {
-      x: Math.max(0, MAP_WIDTH / 2 - halfX),
-      z: Math.max(0, MAP_DEPTH / 2 - halfZ),
-    };
-  };
+  const limits = (): { x: number; z: number } => ({
+    x: MAP_WIDTH / 2,
+    z: MAP_DEPTH / 2,
+  });
 
   const clampGoal = () => {
-    const limit = limits(zoomGoal.current);
-    if (!limit) return;
+    const limit = limits();
     goal.current.x = clamp(goal.current.x, -limit.x, limit.x);
     goal.current.z = clamp(goal.current.z, -limit.z, limit.z);
   };
