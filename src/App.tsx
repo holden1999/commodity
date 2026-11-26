@@ -10,7 +10,7 @@ import {
   isSelectionVisible,
   type SceneVisibility,
 } from './logic/filters.js';
-import { useCiapusStore } from './store/useCiapusStore.js';
+import { useAppStore } from './store/useAppStore.js';
 
 const sameSet = (left: Set<string>, right: Set<string>) =>
   left.size === right.size && [...left].every((id) => right.has(id));
@@ -24,14 +24,14 @@ const SceneView = memo(Scene);
 
 export default function App() {
   const [ready, setReady] = useState(false);
-  const selection = useCiapusStore((state) => state.selection);
-  const select = useCiapusStore((state) => state.select);
-  const clearSelection = useCiapusStore((state) => state.clearSelection);
-  const tick = useCiapusStore((state) => state.tick);
-  const live = useCiapusStore((state) => state.live);
-  const filters = useCiapusStore((state) => state.filters);
-  const focusZonaId = useCiapusStore((state) => state.focusZonaId);
-  const focusNonce = useCiapusStore((state) => state.focusNonce);
+  const selection = useAppStore((state) => state.selection);
+  const select = useAppStore((state) => state.select);
+  const clearSelection = useAppStore((state) => state.clearSelection);
+  const tick = useAppStore((state) => state.tick);
+  const live = useAppStore((state) => state.live);
+  const filters = useAppStore((state) => state.filters);
+  const focusZonaId = useAppStore((state) => state.focusZonaId);
+  const focusNonce = useAppStore((state) => state.focusNonce);
   const visibleRef = useRef<SceneVisibility | null>(null);
 
   const visible = useMemo(() => {

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { buildDecisionStatus } from '../logic/decision.js';
-import { useCiapusStore } from '../store/useCiapusStore.js';
+import { useAppStore } from '../store/useAppStore.js';
 
 const rupiah = (value: number | null) =>
   value === null
@@ -46,9 +46,9 @@ const scoreText = (score: number | null) => {
 };
 
 export function DecisionPanel() {
-  const selection = useCiapusStore((state) => state.selection);
-  const live = useCiapusStore((state) => state.live);
-  const clearSelection = useCiapusStore((state) => state.clearSelection);
+  const selection = useAppStore((state) => state.selection);
+  const live = useAppStore((state) => state.live);
+  const clearSelection = useAppStore((state) => state.clearSelection);
 
   const status = useMemo(
     () => (selection ? buildDecisionStatus(selection, live) : null),

@@ -26,8 +26,8 @@ Open `http://127.0.0.1:8090`.
 embeds that directory, so a built binary does not need the source tree.
 
 ```sh
-go build -buildvcs=false -o ciapus.exe ./cmd/server
-./ciapus.exe -addr 127.0.0.1:8090
+go build -buildvcs=false -o server.exe ./cmd/server
+./server.exe -addr 127.0.0.1:8090
 ```
 
 Docker:

@@ -1,19 +1,19 @@
 import { memo } from 'react';
 import { seed } from '../data/index.js';
 import type { TipeTransaksi } from '../types.js';
-import { useCiapusStore } from '../store/useCiapusStore.js';
+import { useAppStore } from '../store/useAppStore.js';
 
 const chainType = (value: string): TipeTransaksi | 'Semua' =>
   value === 'B2B' || value === 'B2C' || value === 'C2C' ? value : 'Semua';
 
 export const TopBar = memo(function TopBar() {
-  const focusZonaId = useCiapusStore((state) => state.focusZonaId);
-  const focusZona = useCiapusStore((state) => state.focusZona);
-  const filters = useCiapusStore((state) => state.filters);
-  const setHighFloodRisk = useCiapusStore((state) => state.setHighFloodRisk);
-  const setHighFuzzy = useCiapusStore((state) => state.setHighFuzzy);
-  const setRantaiPasokType = useCiapusStore((state) => state.setRantaiPasokType);
-  const resetFilters = useCiapusStore((state) => state.resetFilters);
+  const focusZonaId = useAppStore((state) => state.focusZonaId);
+  const focusZona = useAppStore((state) => state.focusZona);
+  const filters = useAppStore((state) => state.filters);
+  const setHighFloodRisk = useAppStore((state) => state.setHighFloodRisk);
+  const setHighFuzzy = useAppStore((state) => state.setHighFuzzy);
+  const setRantaiPasokType = useAppStore((state) => state.setRantaiPasokType);
+  const resetFilters = useAppStore((state) => state.resetFilters);
 
   const activeFilters =
     Number(filters.highFloodRisk) +

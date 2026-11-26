@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { buildKpi } from '../logic/kpi.js';
-import { useCiapusStore } from '../store/useCiapusStore.js';
+import { useAppStore } from '../store/useAppStore.js';
 
 const signedPct = (value: number | null) =>
   value === null ? '—' : `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
 
 export function KpiPanel() {
-  const live = useCiapusStore((state) => state.live);
+  const live = useAppStore((state) => state.live);
   const kpi = useMemo(() => buildKpi(live), [live]);
 
   const cards = [

@@ -8,7 +8,7 @@ import {
   type Selection,
 } from '../logic/types.js';
 
-interface CiapusStore {
+interface AppStore {
   selection: Selection | null;
   live: LiveState;
   focusZonaId: string | null;
@@ -24,7 +24,7 @@ interface CiapusStore {
   resetFilters: () => void;
 }
 
-export const useCiapusStore = create<CiapusStore>((set) => ({
+export const useAppStore = create<AppStore>((set) => ({
   selection: null,
   live: createInitialLive(),
   focusZonaId: null,

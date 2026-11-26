@@ -11,9 +11,9 @@ COPY go.mod ./
 COPY cmd ./cmd
 COPY internal ./internal
 COPY --from=web /app/internal/web/dist ./internal/web/dist
-RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /out/ciapus ./cmd/server
+RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /out/server ./cmd/server
 
 FROM gcr.io/distroless/static-debian12:nonroot
-COPY --from=build /out/ciapus /ciapus
+COPY --from=build /out/server /server
 EXPOSE 8090
-ENTRYPOINT ["/ciapus", "-addr", "0.0.0.0:8090"]
+ENTRYPOINT ["/server", "-addr", "0.0.0.0:8090"]

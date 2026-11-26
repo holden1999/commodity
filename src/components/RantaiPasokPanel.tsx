@@ -1,9 +1,9 @@
 import { memo, useMemo } from 'react';
 import { selectRantaiPasok } from '../logic/filters.js';
-import { useCiapusStore } from '../store/useCiapusStore.js';
+import { useAppStore } from '../store/useAppStore.js';
 
 export const RantaiPasokPanel = memo(function RantaiPasokPanel() {
-  const filters = useCiapusStore((state) => state.filters);
+  const filters = useAppStore((state) => state.filters);
   const rows = useMemo(
     () => selectRantaiPasok(filters.rantaiPasokType),
     [filters.rantaiPasokType],
