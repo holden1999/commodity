@@ -12,6 +12,7 @@ import type { LiveState, Selection, SelectionKind } from './types.js';
 const RIVER_NAMES: Record<string, string> = {
   cisadane: 'Sungai Cisadane',
   cisindangbarang: 'Sungai Cisindangbarang',
+  cikarti: 'Sungai Cikarti',
 };
 
 export interface DecisionStatus {
@@ -21,6 +22,7 @@ export interface DecisionStatus {
   zona: string;
   fuzzyScore: number | null;
   recommendedKomoditas: string | null;
+  recommendedKomoditasId?: string | null;
   soilPh: number | null;
   waterPh: number | null;
   rainfallMm: number | null;
@@ -84,6 +86,7 @@ function statusFromPetak(
   const zona = zonaFor(petak);
   const input = landInput(petak, live);
   const ranked = rankCommodities(input, 'Pertanian');
+  const recommendation = recommendedId(ranked, petak.komoditasId);
   const assignedId = petak.komoditasId ?? ranked[0]?.komoditasId ?? null;
   const profile = assignedId ? profileFor(assignedId) : undefined;
   const score = profile
@@ -96,7 +99,8 @@ function statusFromPetak(
     name: petak.nama,
     zona: zona?.nama ?? '—',
     fuzzyScore: score,
-    recommendedKomoditas: commodityName(recommendedId(ranked, petak.komoditasId)),
+    recommendedKomoditasId: recommendation,
+    recommendedKomoditas: commodityName(recommendation),
     soilPh: petak.phTanah,
     waterPh: null,
     rainfallMm: input.curahHujanMm,
@@ -114,6 +118,7 @@ function statusFromKolam(kolamId: string, live: LiveState): DecisionStatus | nul
   const zona = zonaFor(petak);
   const input = waterInput(kolam, petak, live);
   const ranked = rankCommodities(input, 'Perikanan');
+  const recommendation = recommendedId(ranked, kolam.komoditasId);
   const profile = profileFor(kolam.komoditasId);
   const komoditas = commodityName(kolam.komoditasId);
   return {
@@ -122,7 +127,8 @@ function statusFromKolam(kolamId: string, live: LiveState): DecisionStatus | nul
     name: `${komoditas ?? 'Kolam'} · ${kolam.tipe}`,
     zona: zona?.nama ?? '—',
     fuzzyScore: profile ? calculateFuzzyScore(input, profile) : null,
-    recommendedKomoditas: commodityName(recommendedId(ranked, kolam.komoditasId)),
+    recommendedKomoditasId: recommendation,
+    recommendedKomoditas: commodityName(recommendation),
     soilPh: null,
     waterPh: kolam.phAir,
     rainfallMm: input.curahHujanMm,
@@ -140,6 +146,7 @@ function statusFromTernak(ternakId: string, live: LiveState): DecisionStatus | n
   const zona = zonaFor(petak);
   const input = landInput(petak, live);
   const ranked = rankCommodities(input, 'Peternakan');
+  const recommendation = recommendedId(ranked, ternak.komoditasId);
   const profile = profileFor(ternak.komoditasId);
 
   return {
@@ -148,7 +155,8 @@ function statusFromTernak(ternakId: string, live: LiveState): DecisionStatus | n
     name: `Kandang ${ternak.jenis}`,
     zona: zona?.nama ?? '—',
     fuzzyScore: profile ? calculateFuzzyScore(input, profile) : null,
-    recommendedKomoditas: commodityName(recommendedId(ranked, ternak.komoditasId)),
+    recommendedKomoditasId: recommendation,
+    recommendedKomoditas: commodityName(recommendation),
     soilPh: petak.phTanah,
     waterPh: null,
     rainfallMm: input.curahHujanMm,
@@ -254,7 +262,14 @@ export function buildDecisionStatus(
   switch (selection.kind) {
     case 'petak': {
       const petak = seed.petak.find((row) => row.id === selection.id);
-      return petak ? statusFromPetak(petak, live) : null;
+      if (!petak) return null;
+      if (!petak.komoditasId) {
+        const pond = seed.kolam.find((row) => row.petakId === petak.id);
+        const pen = seed.ternak.find((row) => row.petakId === petak.id);
+        const facility = pond ? statusFromKolam(pond.id, live) : pen ? statusFromTernak(pen.id, live) : null;
+        if (facility) return { ...facility, id: petak.id, kind: 'petak', name: petak.nama };
+      }
+      return statusFromPetak(petak, live);
     }
     case 'kolam':
       return statusFromKolam(selection.id, live);

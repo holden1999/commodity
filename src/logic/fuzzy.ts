@@ -10,6 +10,11 @@ export interface FuzzyInput {
   ndvi: number;
   slope: number;
   mdpl: number;
+  /** 0-100 solar exposure, derived from season, weather, and elevation. */
+  sunExposure: number;
+  /** 0-100 surface flow, derived from slope, rain, and weather. */
+  waterflow: number;
+  flooded?: boolean;
   suhuAir?: number;
   /** Dissolved oxygen, mg/L. */
   do?: number;
@@ -122,14 +127,19 @@ function membership(value: number, min: number, max: number, tolerance: number) 
 
 /**
  * Pure 0-100 suitability score. No React, store, or scene dependency.
- * Land uses pH, rain, NDVI, slope, and elevation. Water uses pH,
- * temperature, dissolved oxygen, and a small rain-exchange weight.
+ * Land uses pH, rain, NDVI, slope, elevation, solar exposure, and surface
+ * flow. Water uses pH, temperature, dissolved oxygen, rain, solar, and flow.
  */
 export function calculateFuzzyScore(
   input: FuzzyInput,
   profile: FuzzyProfile,
 ): number {
   if (profile.kind !== input.kind) return 0;
+
+  if (input.flooded) {
+    const baseline = calculateFuzzyScore({ ...input, flooded: false }, profile);
+    return Math.round(baseline * (profile.komoditasId === 'kom-padi' ? 0.65 : 0.35));
+  }
 
   const ph = membership(
     input.ph,
@@ -138,6 +148,11 @@ export function calculateFuzzyScore(
     input.kind === 'air' ? 1.5 : 1.2,
   );
   const rain = membership(input.curahHujanMm, profile.rainMin, profile.rainMax, 900);
+  const sun = clamp01(input.sunExposure / 100);
+  const flow =
+    input.kind === 'air'
+      ? 1 - clamp01(Math.abs(input.waterflow - 55) / 55)
+      : 1 - clamp01((input.waterflow - 30) / 70);
 
   if (input.kind === 'air') {
     const temperature =
@@ -152,7 +167,14 @@ export function calculateFuzzyScore(
         : 0;
 
     return Math.round(
-      clamp01(ph * 0.35 + temperature * 0.3 + oxygen * 0.25 + rain * 0.1) * 100,
+      clamp01(
+        ph * 0.3 +
+          temperature * 0.25 +
+          oxygen * 0.25 +
+          rain * 0.08 +
+          sun * 0.02 +
+          flow * 0.1,
+      ) * 100,
     );
   }
 
@@ -165,7 +187,13 @@ export function calculateFuzzyScore(
 
   return Math.round(
     clamp01(
-      ph * 0.35 + rain * 0.25 + ndvi * 0.25 + slope * 0.1 + elevation * 0.05,
+      ph * 0.3 +
+        rain * 0.2 +
+        ndvi * 0.2 +
+        slope * 0.08 +
+        elevation * 0.04 +
+        sun * 0.1 +
+        flow * 0.08,
     ) * 100,
   );
 }

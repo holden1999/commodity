@@ -43,6 +43,7 @@ Thumbs.db
 .cache/
 .qa/
 *.log
+graphify-out/
 
 # TypeScript data layer
 node_modules/

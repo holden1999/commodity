@@ -9,6 +9,8 @@ const chainType = (value: string): TipeTransaksi | 'Semua' =>
 export const TopBar = memo(function TopBar() {
   const focusZonaId = useAppStore((state) => state.focusZonaId);
   const focusZona = useAppStore((state) => state.focusZona);
+  const select = useAppStore((state) => state.select);
+  const clearSelection = useAppStore((state) => state.clearSelection);
   const filters = useAppStore((state) => state.filters);
   const setHighFloodRisk = useAppStore((state) => state.setHighFloodRisk);
   const setHighFuzzy = useAppStore((state) => state.setHighFuzzy);
@@ -36,7 +38,12 @@ export const TopBar = memo(function TopBar() {
         <span>Fokus zona</span>
         <select
           value={focusZonaId ?? ''}
-          onChange={(event) => focusZona(event.target.value || null)}
+          onChange={(event) => {
+            const next = event.target.value || null;
+            focusZona(next);
+            if (next) select({ kind: 'zona', id: next });
+            else clearSelection();
+          }}
         >
           <option value="">Semua zona</option>
           {seed.zona.map((zona) => (
@@ -99,6 +106,10 @@ export const TopBar = memo(function TopBar() {
         <span>
           <i className="swatch swatch--water" />
           Perikanan
+        </span>
+        <span>
+          <i className="swatch swatch--boundary" />
+          Batas desa (OSM)
         </span>
       </div>
     </header>

@@ -1,5 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
+import { basinClip } from './basinClip.js';
+import type { PondBasin } from './pondBasin.js';
+import { channelTerrainYAt } from './riverNetwork.js';
 import {
   MAP_BACKGROUND,
   MAP_DEPTH,
@@ -35,7 +38,7 @@ function buildTerrainGeometry() {
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index);
     const z = positions.getZ(index);
-    positions.setY(index, terrainYAt(x, z));
+    positions.setY(index, channelTerrainYAt(x, z));
 
     const t = clamp(
       (sampleElevation(x, z) - TERRAIN_MIN_MDPL) /
@@ -203,7 +206,10 @@ function buildGridGeometry() {
 }
 
 /** Terrain mesh from the real SRTM grid. */
-export function Terrain({ night = false }: { night?: boolean }) {
+export function Terrain({ excavations, night = false, wet = false, dry = false }: {
+  excavations: readonly PondBasin[]; night?: boolean; wet?: boolean; dry?: boolean;
+}) {
+  const clip = useMemo(() => basinClip(excavations), [excavations]);
   const geometry = useMemo(() => buildTerrainGeometry(), []);
   const contours = useMemo(() => buildContourGeometry(), []);
   const grid = useMemo(() => buildGridGeometry(), []);
@@ -220,13 +226,14 @@ export function Terrain({ night = false }: { night?: boolean }) {
   return (
     <>
       <mesh geometry={geometry} receiveShadow>
-        <meshLambertMaterial
+        <meshStandardMaterial key={clip.customProgramCacheKey()} {...clip}
           vertexColors
-          color={night ? '#4c687a' : '#ffffff'}
+          roughness={wet ? .65 : 1}
+          color={night ? '#4c687a' : wet ? '#c4c5ad' : dry ? '#f1dbad' : '#ffffff'}
         />
       </mesh>
       <lineSegments geometry={contours} raycast={() => {}}>
-        <lineBasicMaterial
+        <lineBasicMaterial key={clip.customProgramCacheKey()} {...clip}
           color={night ? '#2c5368' : '#3f5d37'}
           transparent
           opacity={night ? 0.45 : 0.38}
@@ -234,7 +241,7 @@ export function Terrain({ night = false }: { night?: boolean }) {
         />
       </lineSegments>
       <lineSegments geometry={grid} raycast={() => {}}>
-        <lineBasicMaterial
+        <lineBasicMaterial key={clip.customProgramCacheKey()} {...clip}
           color={night ? '#38bdf8' : '#4a6a3c'}
           transparent
           opacity={night ? 0.14 : 0.12}

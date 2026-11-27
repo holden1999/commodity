@@ -63,7 +63,7 @@ func NextLiveState(state LiveState, randomFn func() float64) LiveState {
 		if v, ok := state.RainfallByPetak[p.ID]; ok {
 			curRain = v
 		}
-		rainfall[p.ID] = math.Round(clamp(curRain+(randomFn()-0.5)*240, 2600, 4600))
+		rainfall[p.ID] = curRain
 
 		curNdvi := p.NDVI
 		if v, ok := state.NdviByPetak[p.ID]; ok {

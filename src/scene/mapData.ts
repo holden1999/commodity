@@ -60,49 +60,8 @@ export interface MapRoad {
   nama: string;
   points: readonly (readonly [number, number])[];
   width: number;
+  bridge?: boolean;
+  tunnel?: boolean;
 }
 
-export const ROADS: readonly MapRoad[] = [
-  {
-    id: '72012936',
-    nama: 'Jalan Kereteg–Petir',
-    points: [[36.77, 8.87], [33.01, 10.22], [29.99, 10.38], [23.74, 9.15], [19.77, 9.68], [17.59, 8.34]],
-    width: 1.15,
-  },
-  {
-    id: '72012955',
-    nama: 'Jalan Kereteg–Petir',
-    points: [[16.83, 8.16], [14.63, 10.3], [8.8, 9.51], [6.68, 10.68], [6.55, 18.13], [2.89, 22.63], [-3.62, 23.94], [-11.49, 27.97], [-20.58, 27.41], [-26.64, 29.06], [-32.07, 32.34]],
-    width: 1.15,
-  },
-  {
-    id: '178896184',
-    nama: 'Jembatan Cibinong',
-    points: [[17.59, 8.34], [16.83, 8.16]],
-    width: 1.15,
-  },
-  {
-    id: '256136956',
-    nama: 'Jalan Kereteg–Petir',
-    points: [[-42.0, 35.83], [-38.73, 35.13], [-35.56, 35.7], [-32.07, 32.34]],
-    width: 1.15,
-  },
-  {
-    id: '674966725',
-    nama: 'Jalan Kereteg–Petir',
-    points: [[36.77, 8.87], [38.91, 8.76], [42.0, 12.87]],
-    width: 1.15,
-  },
-  {
-    id: '674966726',
-    nama: 'Jalan Kereteg–Petir',
-    points: [[42.0, 13.23], [38.87, 9.18], [36.77, 8.87]],
-    width: 1.15,
-  },
-  {
-    id: '720133153',
-    nama: 'Jalan Dramaga/Batas Kota Bogor–Ciherang',
-    points: [[-18.14, -36.0], [-18.6, -24.13], [-17.72, -19.34], [-18.0, -14.08], [-19.86, -7.27], [-22.39, -2.18], [-24.92, 10.28], [-24.26, 13.27], [-25.8, 22.58], [-28.48, 27.1], [-31.8, 30.6], [-32.07, 32.34]],
-    width: 1.15,
-  },
-];
+export { MAPPED_ROADS as ROADS } from './osmCiapus.js';

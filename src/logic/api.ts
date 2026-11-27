@@ -1,3 +1,4 @@
+import type { PsiidnForecast } from './environment.js';
 import type { DecisionStatus } from './decision.js';
 import type { RantaiPasokView } from './filters.js';
 import type { KpiSummary } from './kpi.js';
@@ -63,3 +64,18 @@ export const postLiveTick = (
   selection: Selection | null,
   signal?: AbortSignal,
 ) => requestSnapshot('/api/live/tick', 'POST', filters, selection, signal);
+
+export async function fetchPsiidnForecast(signal?: AbortSignal): Promise<PsiidnForecast | undefined> {
+  try {
+    const response = await fetch('/api/weather/psiidn', { signal });
+    if (!response.ok) return undefined;
+    const data = await response.json() as PsiidnForecast;
+    if (!Number.isFinite(Date.parse(data.validAt)) ||
+        ![data.rainRateMmH, data.humidityPct, data.windMps, data.temperatureC].every(Number.isFinite)) {
+      return undefined;
+    }
+    return data;
+  } catch {
+    return undefined;
+  }
+}

@@ -1,4 +1,5 @@
 import { seed } from '../data/index.js';
+import { DEFAULT_ENVIRONMENT } from './environment.js';
 import type { LiveState } from './types.js';
 import { latestHarga } from './prices.js';
 
@@ -26,13 +27,14 @@ export function createInitialLive(): LiveState {
       seed.petak.map((petak) => [petak.id, petak.ndvi]),
     ),
     bapanasByKomoditas: { ...INITIAL_BAPANAS },
+    environment: { ...DEFAULT_ENVIRONMENT },
     updatedAt: new Date().toISOString(),
     tick: 0,
   };
 }
 
 /**
- * One simulated observation step. The random source is injectable so the
+ * One simulated NDVI and price update. The random source is injectable so the
  * update rule can be tested without a timer or a browser.
  */
 export function nextLiveState(
@@ -41,10 +43,7 @@ export function nextLiveState(
 ): LiveState {
   const rainfallByPetak: Record<string, number> = {};
   for (const petak of seed.petak) {
-    const current = state.rainfallByPetak[petak.id] ?? petak.curahHujanMm;
-    rainfallByPetak[petak.id] = Math.round(
-      clamp(current + (random() - 0.5) * 240, 2600, 4600),
-    );
+    rainfallByPetak[petak.id] = state.rainfallByPetak[petak.id] ?? petak.curahHujanMm;
   }
 
   const ndviByPetak: Record<string, number> = {};
@@ -73,6 +72,10 @@ export function nextLiveState(
     rainfallByPetak,
     ndviByPetak,
     bapanasByKomoditas,
+    environment: state.environment,
+    floodedPetak: state.floodedPetak,
+    fuzzyByPetak: state.fuzzyByPetak,
+    fuzzyByKolam: state.fuzzyByKolam,
     updatedAt: new Date().toISOString(),
     tick: state.tick + 1,
   };

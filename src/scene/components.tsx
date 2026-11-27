@@ -1,31 +1,31 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { ThreeEvent } from '@react-three/fiber';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { Kolam, Komoditas, Ternak } from '../types.js';
-import type { MapRiver, MapRoad } from './mapData.js';
+import type { JenisTernak, Kolam, Komoditas, Ternak } from '../types.js';
+import { ROADS, type MapRiver } from './mapData.js';
+import { MAPPED_BANKS } from './osmCiapus.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import type { WaterLevel } from './CropPlot.js';
+import { Aerator, FishSchool, PenAnimals } from './FacilityLife.js';
+import { VILLAGE_BOUNDARY } from './villageBoundary.js';
 import type {
-  PetakPlacement,
+  LocalPoint,
+  PlotFootprint,
   ZoneCell,
   ZonePlacement,
   ZoneSegment,
 } from './layout.js';
-import { PASAR_POSITION, TREE_POSITIONS } from './layout.js';
-import { terrainYAt, WORLD_UNITS_PER_METER } from './terrainField.js';
+import { containsLocalPoint, PASAR_POSITION } from './layout.js';
+import { terrainYAt } from './terrainField.js';
+import { HILIR, channelTerrainYAt, outletGrade, riverBankWidth, riverWaterWidth } from './riverNetwork.js';
+import { POND_FLOOR_SCALE, type PondBasin } from './pondBasin.js';
+import { basinClip } from './basinClip.js';
+import { polygonSurfaceGeometry, TerrainPatch } from './TerrainPatch.js';
 import { MapLabel } from './MapLabel.js';
 
 const SOIL = '#8a6a44';
 const LIVESTOCK = '#9a6a42';
-
-const CROP_COLORS: Record<string, string> = {
-  'kom-padi': '#74c34a',
-  'kom-jagung': '#9fb63b',
-  'kom-cabai': '#438f39',
-  'kom-singkong': '#6faa3c',
-  'kom-pisang': '#9cc44a',
-  'kom-kopi': '#356b35',
-  'kom-sayur-daun': '#83cf5b',
-};
 
 const WATER_COLORS: Record<string, string> = {
   'KJA Sungai': '#2f9fd0',
@@ -41,16 +41,8 @@ const ANIMAL_COLORS: Record<string, string> = {
   Itik: '#e8e2d4',
 };
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
 
-function shade(hex: string, amount: number) {
-  const value = Number.parseInt(hex.replace('#', ''), 16);
-  const r = clamp(Math.round(((value >> 16) & 255) * (1 + amount)), 0, 255);
-  const g = clamp(Math.round(((value >> 8) & 255) * (1 + amount)), 0, 255);
-  const b = clamp(Math.round((value & 255) * (1 + amount)), 0, 255);
-  return `#${[r, g, b].map((part) => part.toString(16).padStart(2, '0')).join('')}`;
-}
+
 
 interface SelectableProps {
   selected: boolean;
@@ -139,7 +131,7 @@ interface InstanceItem {
 }
 
 /** One draw call for repeated meshes. Decorations do not receive pointer events. */
-function Instances({
+export function Instances({
   items,
   castShadow = false,
   receiveShadow = false,
@@ -255,9 +247,20 @@ function zoneBoundaryGeometry(segments: readonly ZoneSegment[]) {
 
 export function ZonaTerrace({
   placement,
+  excavations,
   selected,
   onSelect,
-}: { placement: ZonePlacement } & SelectableProps) {
+}: { placement: ZonePlacement; excavations: readonly PondBasin[] } & SelectableProps) {
+  const clip = useMemo(() => basinClip(excavations), [excavations]);
+  const raycast = useMemo(() => function (this: THREE.Mesh, ray: THREE.Raycaster, hits: THREE.Intersection[]) {
+    const candidates: THREE.Intersection[] = [];
+    THREE.Mesh.prototype.raycast.call(this, ray, candidates);
+    for (const hit of candidates) {
+      if (!excavations.some((basin) => containsLocalPoint(
+        basin.rim, hit.point.x - basin.x, hit.point.z - basin.z,
+      ))) hits.push(hit);
+    }
+  }, [excavations]);
   const fill = useMemo(() => zoneFillGeometry(placement.cells), [placement.cells]);
   const boundary = useMemo(
     () => zoneBoundaryGeometry(placement.boundary),
@@ -277,8 +280,8 @@ export function ZonaTerrace({
 
   return (
     <group onClick={(event) => selectObject(event, onSelect)}>
-      <mesh geometry={fill} receiveShadow>
-        <meshBasicMaterial
+      <mesh geometry={fill} raycast={raycast} receiveShadow>
+        <meshBasicMaterial key={clip.customProgramCacheKey()} {...clip}
           color={selected ? '#67e8f9' : '#5f8f4a'}
           transparent
           opacity={selected ? 0.16 : 0.055}
@@ -287,7 +290,7 @@ export function ZonaTerrace({
         />
       </mesh>
       <mesh geometry={boundary} raycast={() => {}}>
-        <meshBasicMaterial
+        <meshBasicMaterial key={clip.customProgramCacheKey()} {...clip}
           color={color}
           transparent
           opacity={selected ? 0.95 : 0.62}
@@ -309,295 +312,153 @@ export function ZonaTerrace({
   );
 }
 
-export interface PetakSurfaceRow {
-  placement: PetakPlacement;
-  komoditas: Komoditas;
-}
-
-function patchGeometry(
-  rows: readonly PetakSurfaceRow[],
-  padding: number,
-  lift: number,
-  colorFor: (row: PetakSurfaceRow) => string,
-) {
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  const cells = 8;
-  const stride = cells + 1;
-  const color = new THREE.Color();
-
-  for (const row of rows) {
-    const { placement } = row;
-    const width = Math.max(0.8, placement.width + padding);
-    const depth = Math.max(0.8, placement.depth + padding);
-    const base = positions.length / 3;
-    color.set(colorFor(row));
-
-    for (let iz = 0; iz <= cells; iz += 1) {
-      for (let ix = 0; ix <= cells; ix += 1) {
-        const x = placement.x - width / 2 + (ix / cells) * width;
-        const z = placement.z - depth / 2 + (iz / cells) * depth;
-        positions.push(x, terrainYAt(x, z) + lift, z);
-        colors.push(color.r, color.g, color.b);
-      }
-    }
-
-    for (let iz = 0; iz < cells; iz += 1) {
-      for (let ix = 0; ix < cells; ix += 1) {
-        const a = base + iz * stride + ix;
-        indices.push(a, a + 1, a + stride, a + 1, a + stride + 1, a + stride);
-      }
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-/** Terrain-following soil and crop surfaces in two draw calls. */
-export function PetakSurfaces({ rows }: { rows: readonly PetakSurfaceRow[] }) {
-  const soil = useMemo(
-    () => patchGeometry(rows, 0.3, 0.02, () => SOIL),
-    [rows],
-  );
-  const crops = useMemo(
-    () =>
-      patchGeometry(
-        rows,
-        -0.22,
-        0.05,
-        (row) => CROP_COLORS[row.komoditas.id] ?? '#6fbf4a',
-      ),
-    [rows],
-  );
-
-  useEffect(
-    () => () => {
-      soil.dispose();
-      crops.dispose();
-    },
-    [soil, crops],
-  );
-
+export function FacilityGround({ footprint: { x, z, width, depth, outline }, flooded, onSelect }: {
+  footprint: PlotFootprint; flooded: boolean; onSelect: () => void;
+}) {
   return (
-    <>
-      <mesh geometry={soil} receiveShadow>
-        <meshLambertMaterial vertexColors side={THREE.DoubleSide} flatShading />
-      </mesh>
-      <mesh geometry={crops} receiveShadow>
-        <meshLambertMaterial vertexColors side={THREE.DoubleSide} flatShading />
-      </mesh>
-    </>
-  );
-}
-
-export function PetakPlot({
-  placement,
-  selected,
-  lowWater = false,
-  onSelect,
-}: { placement: PetakPlacement; lowWater?: boolean } & SelectableProps) {
-  return (
-    <group
-      position={[placement.x, placement.topY, placement.z]}
-      onClick={(event) => selectObject(event, onSelect)}
-    >
-      <mesh position={[0, -0.15, 0]}>
-        <boxGeometry args={[placement.width, 0.3, placement.depth]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-      {lowWater ? (
-        <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, 0]} raycast={() => {}}>
-          <ringGeometry
-            args={[
-              Math.min(placement.width, placement.depth) * 0.36,
-              Math.min(placement.width, placement.depth) * 0.44,
-              24,
-            ]}
-          />
-          <meshBasicMaterial color="#f59e0b" transparent opacity={0.85} depthWrite={false} />
-        </mesh>
-      ) : null}
-      {selected ? (
-        <>
-          <SelectionOutline
-            width={placement.width}
-            depth={placement.depth}
-            height={0.55}
-            y={0.28}
-          />
-          <MapLabel position={[0, 0.95, 0]} tone="crop" icon="crop">
-            <span>{placement.petak.nama}</span>
-            <small>{placement.petak.luasHa} ha</small>
-          </MapLabel>
-        </>
-      ) : null}
+    <group position={[x, 0, z]} onClick={(event) => selectObject(event, onSelect)}>
+      <TerrainPatch x={x} z={z} originY={0} width={width} depth={depth} outline={outline}
+        color={flooded ? '#718590' : SOIL} />
     </group>
   );
 }
 
+function PondBank({ x, z, y, outline, color }: {
+  x: number; z: number; y: number; outline: readonly LocalPoint[]; color: string;
+}) {
+  const geometry = useMemo(() => {
+    const edge = outline.flatMap(([ax, az], i) => {
+      const [bx, bz] = outline[(i + 1) % outline.length]!;
+      const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / .4));
+      return Array.from({ length: steps }, (_, step) =>
+        [ax + (bx - ax) * step / steps, az + (bz - az) * step / steps] as const);
+    });
+    const vertices: number[] = [];
+    edge.forEach(([ax, az], i) => {
+      const [bx, bz] = edge[(i + 1) % edge.length]!;
+      const bankTop = (dx: number, dz: number) => [
+        dx * 1.015, channelTerrainYAt(x + dx * 1.015, z + dz * 1.015) - y + .025, dz * 1.015,
+      ];
+      const lowerA = [ax * POND_FLOOR_SCALE, 0, az * POND_FLOOR_SCALE];
+      const lowerB = [bx * POND_FLOOR_SCALE, 0, bz * POND_FLOOR_SCALE];
+      const upperA = bankTop(ax, az);
+      const upperB = bankTop(bx, bz);
+      vertices.push(...lowerA, ...upperA, ...lowerB, ...upperA, ...upperB, ...lowerB);
+    });
+    const bank = new THREE.BufferGeometry();
+    bank.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    bank.computeVertexNormals();
+    return bank;
+  }, [x, z, y, outline]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <mesh geometry={geometry} receiveShadow>
+    <meshStandardMaterial color={color} roughness={.94} side={THREE.DoubleSide} />
+  </mesh>;
+}
+
 export function KolamPond({
-  kolam,
-  komoditas,
-  placement,
-  offsetX = 0,
-  compact = false,
-  selected,
-  onSelect,
+  kolam, komoditas, basin, stressed, flooded, water,
+  hectares, selected, onSelect,
 }: {
-  kolam: Kolam;
-  komoditas: Komoditas;
-  placement: PetakPlacement;
-  offsetX?: number;
-  compact?: boolean;
+  kolam: Kolam; komoditas: Komoditas; basin: PondBasin;
+  stressed: boolean; flooded: boolean; water: WaterLevel;
+  hectares: number;
 } & SelectableProps) {
-  // 1:100 scale aligned with terrain (~0.045 world units/meter, readable floor).
-  const width = clamp(
-    Math.sqrt(kolam.luasM2) * WORLD_UNITS_PER_METER * 1.4,
-    1.15,
-    compact ? 1.75 : 2.3,
-  );
-  const depth = width * 0.68;
-  const waterColor = WATER_COLORS[kolam.tipe] ?? '#3b9dcc';
+  const { x, z, floorY: y, width, depth, rim } = basin;
+  const tarp = kolam.tipe === 'Bioflok' || kolam.tipe === 'Kolam Terpal';
+  const waterGeometry = useMemo(() => polygonSurfaceGeometry(rim), [rim]);
+  useEffect(() => () => waterGeometry.dispose(), [waterGeometry]);
+  const surface = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (surface.current) surface.current.position.y = .12 + water.current * .21;
+  });
+  const base = tarp ? '#242b2b' : stressed ? '#858582' : '#786042';
+  const waterColor = flooded || stressed ? '#738e97' : WATER_COLORS[kolam.tipe] ?? '#348bb4';
 
   return (
-    <group
-      position={[placement.x + offsetX, placement.topY, placement.z]}
-      onClick={(event) => selectObject(event, onSelect)}
-    >
-      <mesh position={[0, 0.1, 0]} receiveShadow>
-        <boxGeometry args={[width + 0.36, 0.2, depth + 0.36]} />
-        <meshStandardMaterial color={SOIL} roughness={1} flatShading />
+    <group position={[x, y, z]}
+      onClick={(event) => selectObject(event, onSelect)}>
+      <mesh geometry={waterGeometry} scale={[POND_FLOOR_SCALE + .004, 1, POND_FLOOR_SCALE + .004]}
+        receiveShadow>
+        <meshStandardMaterial color={base} roughness={.94} />
       </mesh>
-      <mesh position={[0, 0.21, 0]} receiveShadow>
-        <boxGeometry args={[width, 0.08, depth]} />
-        <meshStandardMaterial
-          color={waterColor}
-          roughness={0.2}
-          metalness={0.15}
-          transparent
-          opacity={0.93}
-        />
-      </mesh>
-      <mesh position={[0, 0.255, 0]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[width * 0.82, depth * 0.82]} />
-        <meshStandardMaterial color="#8fd3ea" transparent opacity={0.28} />
-      </mesh>
-
-      <group position={[0, 0.26, 0]}>
-        <mesh position={[0, 0.16, 0]}>
-          <cylinderGeometry args={[0.03, 0.04, 0.32, 6]} />
-          <meshStandardMaterial color="#d8d2bd" roughness={0.8} />
+      <PondBank x={x} z={z} y={y} outline={rim} color={base} />
+      <group ref={surface} position-y={.2}>
+        <mesh geometry={waterGeometry} receiveShadow>
+          <meshStandardMaterial color={waterColor} roughness={.23} metalness={.16} />
         </mesh>
-        <mesh position={[0, 0.33, 0]} rotation-x={Math.PI / 2}>
-          <torusGeometry args={[0.2, 0.03, 6, 12]} />
-          <meshStandardMaterial color="#d8d2bd" roughness={0.8} />
-        </mesh>
+        <FishSchool width={width} depth={depth} />
+        {tarp && <Aerator />}
       </group>
-
-      <MapLabel position={[0, 0.85, 0]} tone="water" icon="fish">
+      <MapLabel position={[0, channelTerrainYAt(x, z) - y + .72, 0]} tone="water" icon="fish">
         <span>{komoditas.nama}</span>
-        <small>{kolam.tipe}</small>
+        <small>{kolam.tipe} · {hectares} ha{flooded ? ' · Banjir' : stressed ? ' · Kurang sesuai' : ''}</small>
       </MapLabel>
-      {selected ? (
-        <SelectionOutline
-          width={width + 0.5}
-          depth={depth + 0.5}
-          height={0.65}
-          y={0.325}
-        />
-      ) : null}
+      {selected && <SelectionOutline width={width + .5} depth={depth + .5} height={.65} />}
     </group>
   );
 }
 
 export function KandangPen({
-  ternak,
+  ternak, jenis, stressed, flooded,
   komoditas,
   placement,
-  offsetX = 0,
-  compact = false,
+  hectares,
   cutaway = false,
   night = false,
   selected,
   onSelect,
 }: {
   ternak: Ternak;
+  jenis: JenisTernak;
+  stressed: boolean;
+  flooded: boolean;
   komoditas: Komoditas;
-  placement: PetakPlacement;
-  offsetX?: number;
-  compact?: boolean;
+  placement: PlotFootprint;
+  hectares: number;
   cutaway?: boolean;
   night?: boolean;
 } & SelectableProps) {
-  // 1:100 scale aligned with terrain (~0.045 world units/meter).
-  const width = clamp(
-    Math.sqrt(ternak.jumlah) * 0.14,
-    compact ? 1.3 : 1.5,
-    compact ? 1.7 : 2.2,
-  );
-  const depth = width * 0.72;
-  const animalColor = ANIMAL_COLORS[ternak.jenis] ?? LIVESTOCK;
+  const { x, z, width, depth, outline } = placement;
+  const y = terrainYAt(x, z);
+  const ground = useMemo(() => (dx: number, dz: number) => terrainYAt(x + dx, z + dz) - y, [x, y, z]);
+  const animalColor = stressed ? '#b1ae9f' : ANIMAL_COLORS[jenis];
   const animals = Math.min(4, Math.max(2, Math.ceil(ternak.jumlah / 100)));
 
   const decor = useMemo(() => {
-    const posts: InstanceItem[] = [
-      [-width / 2, -depth / 2],
-      [width / 2, -depth / 2],
-      [-width / 2, depth / 2],
-      [width / 2, depth / 2],
-    ].map(([x, z]) => ({
-      position: [x ?? 0, 0.24, z ?? 0],
-      scale: [0.06, 0.38, 0.06],
-    }));
-
-    const rails: InstanceItem[] = [
-      { position: [0, 0.24, depth / 2], scale: [width, 0.04, 0.04] },
-      { position: [0, 0.24, -depth / 2], scale: [width, 0.04, 0.04] },
-      { position: [width / 2, 0.24, 0], scale: [0.04, 0.04, depth] },
-      { position: [-width / 2, 0.24, 0], scale: [0.04, 0.04, depth] },
-    ];
-
-    const animalPositions: [number, number][] = [
-      [-width * 0.24, depth * 0.18],
-      [width * 0.2, depth * 0.22],
-      [-width * 0.12, -depth * 0.18],
-      [width * 0.26, -depth * 0.22],
-    ];
-    const bodies: InstanceItem[] = [];
-    const heads: InstanceItem[] = [];
-
-    for (let index = 0; index < animals; index += 1) {
-      const [x, z] = animalPositions[index] ?? [0, 0];
-      bodies.push({
-        position: [x, 0.16, z],
-        scale: [0.24, 0.14, 0.16],
-        color: animalColor,
-      });
-      heads.push({
-        position: [x + 0.15, 0.21, z],
-        scale: [0.1, 0.1, 0.1],
-        color: animalColor,
-      });
-    }
-
-    return { posts, rails, bodies, heads };
-  }, [width, depth, animals, animalColor]);
+    const posts: InstanceItem[] = [];
+    const rails: InstanceItem[] = [];
+    outline.forEach(([ax, az], index) => {
+      const [bx, bz] = outline[(index + 1) % outline.length]!;
+      const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / .85);
+      for (let i = 0; i < steps; i++) {
+        const x1 = ax + (bx - ax) * i / steps;
+        const z1 = az + (bz - az) * i / steps;
+        const x2 = ax + (bx - ax) * (i + 1) / steps;
+        const z2 = az + (bz - az) * (i + 1) / steps;
+        const h1 = ground(x1, z1);
+        const h2 = ground(x2, z2);
+        posts.push({ position: [x1, h1 + .22, z1], scale: [.065, .43, .065] });
+        const direction = new THREE.Vector3(x2 - x1, h2 - h1, z2 - z1);
+        const rotation = new THREE.Euler().setFromQuaternion(new THREE.Quaternion()
+          .setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.clone().normalize()));
+        rails.push({
+          position: [(x1 + x2) / 2, (h1 + h2) / 2 + .26, (z1 + z2) / 2],
+          rotation: [rotation.x, rotation.y, rotation.z],
+          scale: [direction.length(), .044, .045],
+        });
+      }
+    });
+    return { posts, rails };
+  }, [outline, ground]);
 
   return (
     <group
-      position={[placement.x + offsetX, placement.topY, placement.z]}
+      position={[x, y, z]}
       onClick={(event) => selectObject(event, onSelect)}
     >
-      <mesh position={[0, 0.05, 0]} receiveShadow>
-        <boxGeometry args={[width, 0.1, depth]} />
-        <meshStandardMaterial color={LIVESTOCK} roughness={1} flatShading />
-      </mesh>
+      <TerrainPatch x={x} z={z} originY={y} width={width} depth={depth} outline={outline}
+        color={flooded ? '#718590' : stressed ? '#8d8880' : LIVESTOCK} />
 
       <Instances items={decor.posts}>
         <boxGeometry args={[1, 1, 1]} />
@@ -607,16 +468,10 @@ export function KandangPen({
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color="#6f4d31" roughness={1} />
       </Instances>
-      <Instances items={decor.bodies}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#ffffff" roughness={1} flatShading />
-      </Instances>
-      <Instances items={decor.heads}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#ffffff" roughness={1} flatShading />
-      </Instances>
+      <PenAnimals jenis={jenis} count={stressed ? Math.min(2, animals) : animals}
+        width={width} depth={depth} color={animalColor} ground={ground} />
 
-      <group position={[0, 0, -depth * 0.12]}>
+      <group position={[0, ground(0, -depth * .12), -depth * .12]}>
         <mesh position={[0, cutaway ? 0.14 : 0.26, 0]} castShadow>
           <boxGeometry args={[width * 0.42, cutaway ? 0.16 : 0.34, depth * 0.38]} />
           <meshStandardMaterial
@@ -629,7 +484,7 @@ export function KandangPen({
         </mesh>
         {!cutaway ? (
           <mesh position={[0, 0.52, 0]} rotation-y={Math.PI / 4} castShadow>
-            <coneGeometry args={[width * 0.36, 0.24, 4]} />
+            <coneGeometry args={[Math.min(width, depth) * 0.36, 0.24, 4]} />
             <meshStandardMaterial color="#9c5b3f" roughness={1} flatShading />
           </mesh>
         ) : (
@@ -641,9 +496,9 @@ export function KandangPen({
       </group>
 
       <MapLabel position={[0, 1.0, 0]} tone="livestock" icon="livestock">
-        <span>Kandang {ternak.jenis}</span>
+        <span>Kandang {jenis}</span>
         <small>
-          {ternak.jumlah} ekor · {komoditas.nama}
+          {ternak.jumlah} ekor · {hectares} ha · {komoditas.nama}{flooded ? ' · Banjir' : stressed ? ' · Kurang sesuai' : ''}
         </small>
       </MapLabel>
       {selected ? (
@@ -677,9 +532,12 @@ export function Pasar({
     const stripes: InstanceItem[] = [];
     const crates: InstanceItem[] = [];
 
+    const ground = (x: number, z: number) =>
+      terrainYAt(PASAR_POSITION.x + x, PASAR_POSITION.z + z) - topY;
     for (const stall of MARKET_STALLS) {
+      const stallY = ground(stall.x, stall.z);
       stalls.push({
-        position: [stall.x, 0.3, stall.z],
+        position: [stall.x, stallY + .3, stall.z],
         scale: [1.1, 0.28, 0.58],
       });
 
@@ -690,14 +548,14 @@ export function Pasar({
         [0.52, 0.26],
       ]) {
         posts.push({
-          position: [stall.x + (x ?? 0), 0.52, stall.z + (z ?? 0)],
+          position: [stall.x + (x ?? 0), stallY + .49, stall.z + (z ?? 0)],
           scale: [0.05, 0.85, 0.05],
         });
       }
 
       for (let stripe = 0; stripe < 5; stripe += 1) {
         stripes.push({
-          position: [stall.x - 0.48 + stripe * 0.24, 0.94, stall.z],
+          position: [stall.x - 0.48 + stripe * 0.24, stallY + .94, stall.z],
           scale: [0.24, 0.06, 0.75],
           color: stripe % 2 === 0 ? stall.color : '#f1e6cf',
         });
@@ -711,27 +569,21 @@ export function Pasar({
       [1.3, -1.05],
     ]) {
       crates.push({
-        position: [x ?? 0, 0.14, z ?? 0],
+        position: [x!, ground(x!, z!) + .14, z!],
         scale: [0.32, 0.2, 0.24],
       });
     }
 
     return { stalls, posts, stripes, crates };
-  }, []);
+  }, [topY]);
 
   return (
     <group
       position={[PASAR_POSITION.x, topY, PASAR_POSITION.z]}
       onClick={(event) => selectObject(event, onSelect)}
     >
-      <mesh position={[0, -0.12, 0]} receiveShadow>
-        <boxGeometry args={[3.6, 0.24, 3.3]} />
-        <meshStandardMaterial color="#cbb98f" roughness={1} flatShading />
-      </mesh>
-      <mesh position={[0, 0.02, 0]} receiveShadow>
-        <boxGeometry args={[3.4, 0.05, 3.1]} />
-        <meshStandardMaterial color="#d9c7a3" roughness={1} />
-      </mesh>
+      <TerrainPatch x={PASAR_POSITION.x} z={PASAR_POSITION.z} originY={topY}
+        width={3.6} depth={3.3} color="#cbb98f" />
 
       <Instances items={decor.stalls} castShadow>
         <boxGeometry args={[1, 1, 1]} />
@@ -779,11 +631,10 @@ function ribbonGeometry(
   width: number,
   heightAt: (x: number, z: number) => number,
   lift: number,
+  preSampled = false,
 ) {
-  const curve = new THREE.CatmullRomCurve3(
-    points.map(([x, z]) => new THREE.Vector3(x, 0, z)),
-  );
-  const samples = curve.getPoints(RIVER_SEGMENTS);
+  const vertices = points.map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const samples = preSampled ? vertices : new THREE.CatmullRomCurve3(vertices).getPoints(RIVER_SEGMENTS);
   const positions: number[] = [];
   const indices: number[] = [];
 
@@ -824,20 +675,20 @@ export function River({
   spec,
   selected,
   onSelect,
-}: { spec: MapRiver } & SelectableProps) {
-  // 1:100 display width; OSM width is not a survey width.
-  const width = spec.width * 0.34;
+}: { spec: MapRiver & { outlet?: boolean } } & SelectableProps) {
+  const width = riverWaterWidth(spec);
+  const surfaceHeight = spec.outlet ? outletGrade : channelTerrainYAt;
   const bank = useMemo(
-    () => ribbonGeometry(spec.points, width + 0.55, terrainYAt, 0.12),
-    [spec, width],
+    () => ribbonGeometry(spec.points, riverBankWidth(spec), channelTerrainYAt, 0.12, true),
+    [spec],
   );
   const water = useMemo(
-    () => ribbonGeometry(spec.points, width, terrainYAt, 0.2),
-    [spec, width],
+    () => ribbonGeometry(spec.points, width, surfaceHeight, 0.2, true),
+    [spec, width, surfaceHeight],
   );
   const outline = useMemo(
-    () => ribbonGeometry(spec.points, width + 0.35, terrainYAt, 0.28),
-    [spec, width],
+    () => ribbonGeometry(spec.points, width + 0.35, surfaceHeight, 0.28, true),
+    [spec, width, surfaceHeight],
   );
 
   useEffect(
@@ -895,6 +746,13 @@ export function River({
           polygonOffsetUnits={-2}
         />
       </mesh>
+      {spec.outlet && (
+        <mesh position={[HILIR[0], outletGrade(...HILIR) + .206, HILIR[1]]}
+          rotation-x={-Math.PI / 2}>
+          <circleGeometry args={[width / 2, 20]} />
+          <meshStandardMaterial color={spec.color} roughness={.25} metalness={.15} />
+        </mesh>
+      )}
       {spec.showLabel ? (
         <MapLabel position={[spec.label[0], labelY, spec.label[1]]} tone="water" icon="water">
           {spec.nama}
@@ -904,56 +762,64 @@ export function River({
   );
 }
 
-export function Road({ spec }: { spec: MapRoad }) {
-  const geometry = useMemo(
-    () => ribbonGeometry(spec.points, spec.width * 0.52, terrainYAt, 0.04),
-    [spec],
-  );
+export function VillageBoundary({ night = false }: { night?: boolean }) {
+  const geometry = useMemo(() => {
+    const ring = [...VILLAGE_BOUNDARY, VILLAGE_BOUNDARY[0]!];
+    return ribbonGeometry(ring, 0.34, terrainYAt, 0.12);
+  }, []);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
-    <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial color="#cdbb8c" roughness={1} />
+    <mesh geometry={geometry} renderOrder={10}>
+      <meshBasicMaterial
+        color={night ? '#9fd7e8' : '#e6b74e'}
+        transparent
+        opacity={night ? 0.9 : 0.82}
+        depthTest={false}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+        toneMapped={false}
+      />
     </mesh>
   );
 }
 
-const TREE_LAYERS = TREE_POSITIONS.map(([x, z], index) => {
-  const green = index % 2 === 0 ? '#4f8a45' : '#5d9c4f';
-  const base = terrainYAt(x, z);
-  return {
-    trunk: { position: [x, base + 0.26, z] as [number, number, number] },
-    lower: {
-      position: [x, base + 0.68, z] as [number, number, number],
-      color: green,
-    },
-    upper: {
-      position: [x, base + 0.96, z] as [number, number, number],
-      color: shade(green, 0.08),
-    },
-  };
-});
+export function Roads() {
+  const geometry = useMemo(() => {
+    const parts = ROADS.filter((road) => !road.tunnel).map((road) =>
+      ribbonGeometry(road.points, road.width, terrainYAt, road.bridge ? .29 : .065, true));
+    const merged = mergeGeometries(parts);
+    parts.forEach((part) => part.dispose());
+    return merged;
+  }, []);
+  useEffect(() => () => geometry?.dispose(), [geometry]);
+  return geometry && <mesh geometry={geometry} receiveShadow raycast={() => {}}>
+    <meshStandardMaterial color="#c6b691" roughness={1} side={THREE.DoubleSide} />
+  </mesh>;
+}
 
-const TREE_TRUNKS = TREE_LAYERS.map((row) => row.trunk);
-const TREE_LOWER = TREE_LAYERS.map((row) => row.lower);
-const TREE_UPPER = TREE_LAYERS.map((row) => row.upper);
-
-export function Trees() {
-  return (
-    <>
-      <Instances items={TREE_TRUNKS}>
-        <cylinderGeometry args={[0.06, 0.1, 0.52, 6]} />
-        <meshStandardMaterial color="#7b5a3c" roughness={1} flatShading />
-      </Instances>
-      <Instances items={TREE_LOWER} castShadow>
-        <coneGeometry args={[0.36, 0.58, 6]} />
-        <meshStandardMaterial color="#ffffff" roughness={1} flatShading />
-      </Instances>
-      <Instances items={TREE_UPPER} castShadow>
-        <coneGeometry args={[0.25, 0.42, 6]} />
-        <meshStandardMaterial color="#ffffff" roughness={1} flatShading />
-      </Instances>
-    </>
-  );
+export function MappedRiverBanks() {
+  const geometry = useMemo(() => {
+    const points: number[] = [];
+    for (const bank of MAPPED_BANKS) {
+      const contour = bank.outer.slice(0, -1).map(([x, z]) => new THREE.Vector2(x, z));
+      const holes = bank.holes.map((ring) => ring.slice(0, -1).map(([x, z]) => new THREE.Vector2(x, z)));
+      const all = [...contour, ...holes.flat()];
+      for (const face of THREE.ShapeUtils.triangulateShape(contour, holes)) {
+        for (const index of face) {
+          const { x, y: z } = all[index]!;
+          points.push(x, terrainYAt(x, z) + .18, z);
+        }
+      }
+    }
+    const mesh = new THREE.BufferGeometry();
+    mesh.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    mesh.computeVertexNormals();
+    return mesh;
+  }, []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <mesh geometry={geometry} receiveShadow raycast={() => {}}>
+    <meshStandardMaterial color="#4e8fa3" roughness={.32} side={THREE.DoubleSide} />
+  </mesh>;
 }

@@ -3,12 +3,15 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"commodity/internal/dss"
 )
 
 func NewHandler(engine *dss.Engine) http.Handler {
 	mux := http.NewServeMux()
+	forecast := &psiidnForecast{client: http.Client{Timeout: 10 * time.Second}}
+	mux.HandleFunc("/api/weather/psiidn", forecast.serveHTTP)
 
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

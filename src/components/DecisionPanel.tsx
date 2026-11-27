@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { buildDecisionStatus } from '../logic/decision.js';
 import { useAppStore } from '../store/useAppStore.js';
+import { ZoneMix } from './ZoneMix.js';
 
 const rupiah = (value: number | null) =>
   value === null
@@ -39,8 +40,7 @@ const scoreTone = (score: number | null) => {
 
 const scoreText = (score: number | null) => {
   if (score === null) return 'Tidak berlaku';
-  if (score >= 80) return 'Sangat sesuai';
-  if (score >= 65) return 'Sesuai';
+  if (score >= 75) return 'Sangat sesuai';
   if (score >= 50) return 'Cukup sesuai';
   return 'Kurang sesuai';
 };
@@ -48,17 +48,11 @@ const scoreText = (score: number | null) => {
 export function DecisionPanel() {
   const selection = useAppStore((state) => state.selection);
   const live = useAppStore((state) => state.live);
-  const serverDecision = useAppStore((state) => state.decision);
   const clearSelection = useAppStore((state) => state.clearSelection);
-  const simPlaying = useAppStore((state) => state.simPlaying);
-  const simSpeed = useAppStore((state) => state.simSpeed);
 
   const status = useMemo(
-    () =>
-      selection
-        ? serverDecision ?? buildDecisionStatus(selection, live)
-        : null,
-    [selection, serverDecision, live],
+    () => (selection ? buildDecisionStatus(selection, live) : null),
+    [selection, live],
   );
 
   if (!status) return null;
@@ -79,6 +73,8 @@ export function DecisionPanel() {
       <p className="decision-panel__eyebrow">{status.kind}</p>
       <h2 className="decision-panel__title">{status.name}</h2>
       <p className="decision-panel__zona">{status.zona}</p>
+
+      {status.kind === 'zona' ? <ZoneMix zonaId={status.id} /> : null}
 
       <div className={`decision-score decision-score--${tone}`}>
         <div className="decision-score__value">
@@ -146,8 +142,7 @@ export function DecisionPanel() {
       </section>
 
       <p className="decision-panel__time">
-        Diperbarui {clock(status.lastUpdated)} ·{' '}
-        {simPlaying ? `simulasi ${simSpeed}×` : 'simulasi dijeda'}
+        Diperbarui {clock(status.lastUpdated)}
       </p>
     </aside>
   );
