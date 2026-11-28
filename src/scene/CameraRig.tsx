@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useAppStore } from '../store/useAppStore.js';
 import { MAP_DEPTH, MAP_WIDTH, TARGET_Y } from './terrainField.js';
 
 const CAMERA_RADIUS = 90;
@@ -8,6 +9,7 @@ const DEFAULT_AZIMUTH = Math.PI / 4;
 const DEFAULT_ELEVATION = Math.atan2(1.15, Math.SQRT2);
 const MIN_ELEVATION = 0.38;
 const MAX_ELEVATION = 1.25;
+const TURN_MS = 600;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -39,12 +41,17 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
   const homeZoom = useRef(2);
   const azimuthGoal = useRef(DEFAULT_AZIMUTH);
   const azimuthCurrent = useRef(DEFAULT_AZIMUTH);
+  const turn = useRef<{ from: number; to: number; start: number } | null>(null);
   const elevationGoal = useRef(DEFAULT_ELEVATION);
   const elevationCurrent = useRef(DEFAULT_ELEVATION);
   const offsetVec = useRef(new THREE.Vector3());
   const initialized = useRef(false);
   const focusRef = useRef(focusTarget);
   const sizeRef = useRef(size);
+  const viewTurns = useAppStore((state) => state.viewTurns);
+  const setViewAzimuth = useAppStore((state) => state.setViewAzimuth);
+  const appliedTurns = useRef(viewTurns);
+  const publishedAzimuth = useRef(Number.NaN);
   focusRef.current = focusTarget;
   sizeRef.current = size;
 
@@ -95,6 +102,7 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
   useEffect(() => {
     const target = focusRef.current;
     const cam = camera as THREE.OrthographicCamera;
+    turn.current = null;
     const viewWidth = cam.right - cam.left;
     const zoneZoom =
       Number.isFinite(viewWidth) && viewWidth > 0
@@ -111,6 +119,20 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     }
     clampGoal();
   }, [focusNonce, size.width, size.height]);
+
+  useEffect(() => {
+    const delta = viewTurns - appliedTurns.current;
+    appliedTurns.current = viewTurns;
+    if (delta !== 0) {
+      const to = azimuthGoal.current + delta * (Math.PI / 2);
+      turn.current = {
+        from: azimuthCurrent.current,
+        to,
+        start: performance.now(),
+      };
+      azimuthGoal.current = to;
+    }
+  }, [viewTurns]);
 
   useEffect(() => {
     const dom = gl.domElement;
@@ -130,6 +152,10 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
         mode = 'pan';
       } else {
         return;
+      }
+      if (mode === 'orbit') {
+        turn.current = null;
+        azimuthGoal.current = azimuthCurrent.current;
       }
       lastX = event.clientX;
       lastY = event.clientY;
@@ -229,11 +255,30 @@ export function CameraRig({ focusTarget, focusNonce }: CameraRigProps) {
     const damping = 1 - Math.exp(-12 * Math.min(delta, 0.1));
     clampGoal();
     current.current.lerp(goal.current, damping);
-    azimuthCurrent.current = THREE.MathUtils.lerp(
-      azimuthCurrent.current,
-      azimuthGoal.current,
-      damping,
-    );
+    if (turn.current) {
+      const t = Math.min(1, (performance.now() - turn.current.start) / TURN_MS);
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2;
+      azimuthCurrent.current =
+        turn.current.from + (turn.current.to - turn.current.from) * eased;
+      if (t >= 1) {
+        turn.current = null;
+        publishedAzimuth.current = Number.NaN;
+      }
+    } else {
+      azimuthCurrent.current = THREE.MathUtils.lerp(
+        azimuthCurrent.current,
+        azimuthGoal.current,
+        damping,
+      );
+    }
+    const azimuthDeg = THREE.MathUtils.radToDeg(azimuthCurrent.current);
+    if (
+      !Number.isFinite(publishedAzimuth.current) ||
+      Math.abs(azimuthDeg - publishedAzimuth.current) >= 2
+    ) {
+      publishedAzimuth.current = azimuthDeg;
+      setViewAzimuth(azimuthDeg);
+    }
     elevationCurrent.current = THREE.MathUtils.lerp(
       elevationCurrent.current,
       elevationGoal.current,

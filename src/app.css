@@ -154,6 +154,71 @@ body {
   background: #78d466;
 }
 
+.compass {
+  position: absolute;
+  right: 22px;
+  bottom: 104px;
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(194, 225, 186, 0.24);
+  border-radius: 50%;
+  background: rgba(13, 43, 28, 0.86);
+  color: #ecfbe6;
+  box-shadow: 0 8px 22px rgba(15, 34, 18, 0.18);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.compass__dial {
+  position: absolute;
+  inset: 0;
+  transition: transform 120ms linear;
+}
+
+.compass__needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -100%);
+  border-right: 4px solid transparent;
+  border-bottom: 19px solid #f0563a;
+  border-left: 4px solid transparent;
+}
+
+.compass__needle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 2px;
+  height: 13px;
+  transform: translateX(-50%);
+  background: rgba(207, 230, 203, 0.55);
+}
+
+.compass__north {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ffb3a0;
+}
+
+.compass__pivot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #ecfbe6;
+}
+
 .app--night .hint {
   border-color: rgba(148, 190, 220, 0.18);
   background: rgba(13, 27, 38, 0.8);

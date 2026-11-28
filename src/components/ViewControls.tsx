@@ -18,6 +18,7 @@ export function ViewControls() {
   const setGrowth = useAppStore((state) => state.setGrowth);
   const toggleTheme = useAppStore((state) => state.toggleTheme);
   const toggleCutaway = useAppStore((state) => state.toggleCutaway);
+  const rotateView = useAppStore((state) => state.rotateView);
   const selectedClimate = environment.dryOverride ? 'Kemarau' :
     environment.weatherOverride ?? 'Otomatis';
   const forecast = environment.forecast;
@@ -53,6 +54,12 @@ export function ViewControls() {
       <button type="button" aria-pressed={cutaway} onClick={toggleCutaway}>
         {cutaway ? 'Tutup atap' : 'Cutaway'}
       </button>
+      <div role="group" aria-label="Arah pandang">
+        <button type="button" aria-label="Putar kiri 90 derajat" title="Putar kiri 90°"
+          onClick={() => rotateView(-1)}>↺</button>
+        <button type="button" aria-label="Putar kanan 90 derajat" title="Putar kanan 90°"
+          onClick={() => rotateView(1)}>↻</button>
+      </div>
     </section>
   );
 }

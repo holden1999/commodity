@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './scene/Scene.js';
 import { DecisionPanel } from './components/DecisionPanel.js';
+import { Compass } from './components/Compass.js';
 import { FuzzyLab } from './components/FuzzyLab.js';
 import { KpiPanel } from './components/KpiPanel.js';
 import { RantaiPasokPanel } from './components/RantaiPasokPanel.js';
@@ -89,6 +90,7 @@ export default function App() {
       <DecisionPanel />
       <RantaiPasokPanel />
       <ViewControls />
+      <Compass />
 
       <p className="hint">
         Click to inspect · Drag to pan · Right-drag to orbit · Scroll to zoom · {' '}

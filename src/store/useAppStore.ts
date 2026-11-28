@@ -1,10 +1,8 @@
 import { create } from 'zustand';
 import type { TipeTransaksi } from '../types.js';
 import { fetchSnapshot, postLiveTick, type ServerSnapshot } from '../logic/api.js';
-import type { DecisionStatus } from '../logic/decision.js';
 import { DEFAULT_ENVIRONMENT, type DayPeriod, type PsiidnForecast } from '../logic/environment.js';
-import type { RantaiPasokView, SceneVisibility } from '../logic/filters.js';
-import type { KpiSummary } from '../logic/kpi.js';
+import type { RantaiPasokView } from '../logic/filters.js';
 import { createInitialLive, nextLiveState } from '../logic/live.js';
 import {
   DEFAULT_FILTERS,
@@ -22,15 +20,14 @@ export type ThemeMode = 'day' | 'night';
 interface AppStore {
   selection: Selection | null;
   live: LiveState;
-  kpi: KpiSummary | null;
-  visibility: SceneVisibility | null;
   rantaiPasok: RantaiPasokView[] | null;
-  decision: DecisionStatus | null;
   focusZonaId: string | null;
   focusNonce: number;
   filters: CiapusFilters;
   theme: ThemeMode;
   cutaway: boolean;
+  viewTurns: number;
+  viewAzimuth: number;
   selectedRantaiId: string | null;
   fuzzyDirty: boolean;
   syncSnapshot: () => Promise<void>;
@@ -40,6 +37,8 @@ interface AppStore {
   focusZona: (zonaId: string | null) => void;
   toggleTheme: () => void;
   toggleCutaway: () => void;
+  rotateView: (delta: 1 | -1) => void;
+  setViewAzimuth: (degrees: number) => void;
   setSeason: (season: Season) => void;
   growth: number;
   setGrowth: (growth: number) => void;
@@ -73,14 +72,7 @@ function applyServerSnapshot(
       fuzzyByPetak: current.fuzzyByPetak,
       fuzzyByKolam: current.fuzzyByKolam,
     },
-    kpi: snapshot.kpi,
-    visibility: {
-      petak: new Set(snapshot.visibility.petak),
-      kolam: new Set(snapshot.visibility.kolam),
-      ternak: new Set(snapshot.visibility.ternak),
-    },
     rantaiPasok: snapshot.rantaiPasok,
-    decision: snapshot.decision,
   });
 }
 
@@ -97,15 +89,15 @@ export const useAppStore = create<AppStore>((set, get) => {
   return {
     selection: null,
     live: createInitialLive(),
-    kpi: null,
-    visibility: null,
     rantaiPasok: null,
-    decision: null,
     focusZonaId: null,
     focusNonce: 0,
     filters: DEFAULT_FILTERS,
     theme: 'day',
     cutaway: false,
+    viewTurns: 0,
+    // matches CameraRig DEFAULT_AZIMUTH (PI/4)
+    viewAzimuth: 45,
     selectedRantaiId: null,
     fuzzyDirty: false,
     growth: 65,
@@ -136,11 +128,11 @@ export const useAppStore = create<AppStore>((set, get) => {
     })),
     syncSnapshot: refreshFromServer,
     select: (selection) => {
-      set({ selection, decision: null });
+      set({ selection });
       void refreshFromServer();
     },
     clearSelection: () => {
-      set({ selection: null, decision: null });
+      set({ selection: null });
     },
     tick: () => {
       const seq = ++requestSeq;
@@ -152,10 +144,7 @@ export const useAppStore = create<AppStore>((set, get) => {
         } else {
           set({
             live: nextLiveState(get().live),
-            kpi: null,
-            visibility: null,
             rantaiPasok: null,
-            decision: null,
           });
         }
       });
@@ -173,6 +162,11 @@ export const useAppStore = create<AppStore>((set, get) => {
       set((state) => ({
         cutaway: !state.cutaway,
       })),
+    rotateView: (delta) =>
+      set((state) => ({
+        viewTurns: state.viewTurns + delta,
+      })),
+    setViewAzimuth: (degrees) => set({ viewAzimuth: degrees }),
     setSeason: (season) =>
       set((state) => ({
         fuzzyDirty: true,
